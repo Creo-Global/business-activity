@@ -39,6 +39,7 @@
     
     // Expose state to window for direct access from event handlers
     window.state = state;
+    window.applyColumnFilters = applyColumnFilters;
   
     // ─── Supabase Client & Cache ───────────────────────────────────
     // Note: Using a dynamic import for the Supabase client.
@@ -1427,6 +1428,8 @@
     }
     
     function setupColumnSearch() {
+      // We'll use the existing implementation for search functionality
+      // No need for a global click handler as it's handled in the existing implementation
       // Store column search values in state for persistence
       if (!state.columnSearches) {
         state.columnSearches = {
@@ -1507,84 +1510,25 @@
           e.preventDefault();
           e.stopPropagation();
           
-    (`Search button clicked for column: ${columnInfo.name} (${columnInfo.field})`);
+          // Use the existing implementation for search functionality
+          const th = headerCell;
           
-          // Find the clear button in the same container
-          const btnDiv = button.closest('.th-btn-div');
-          const clearButton = btnDiv ? btnDiv.querySelector('.btn-clear') : null;
-          
-          // Create search input if it doesn't exist
-          let searchInput = headerCell.querySelector('.column-search-input, .th-search');
-          
-          if (!searchInput) {
-      (`Creating new search input for column ${columnInfo.name}`);
-            // Create search input
-            searchInput = document.createElement('input');
-            searchInput.type = 'text';
-            searchInput.className = 'th-search column-search-input';
-            searchInput.style.cssText = 'width:100%; box-sizing: border-box; padding:5px; margin-top:5px; border:1px solid #ddd; border-radius:4px; display: block;';
-            searchInput.placeholder = 'Type…';
-            searchInput.autocomplete = 'off';
-            
-            // Store column info in the input's data attributes
-            searchInput.dataset.columnName = columnInfo.name;
-            searchInput.dataset.columnField = columnInfo.field;
-            searchInput.dataset.columnStateKey = columnInfo.stateKey;
-            
-            // Set initial value from state if exists
-            if (state.columnSearches[columnInfo.stateKey]) {
-              searchInput.value = state.columnSearches[columnInfo.stateKey];
-            }
-            
-            // Insert after the th-text element
-            const thText = headerCell.querySelector('.th-text');
-            if (thText && thText.parentNode) {
-              thText.parentNode.insertBefore(searchInput, thText.nextSibling);
+          // Call the existing activateSearchForHeader function
+          if (typeof activateSearchForHeader === 'function') {
+            activateSearchForHeader(th);
             } else {
-              headerCell.appendChild(searchInput);
+            // Fallback if the function doesn't exist
+            // Find the index of this header in the table
+            const headerIndex = Array.from(th.parentElement.children).indexOf(th);
+            
+            // Store in state for our database filtering
+            const searchValue = '';
+            state.columnSearches[columnInfo.stateKey] = searchValue;
+            
+            // Call the existing search functionality if it exists
+            if (window.activateSearchForHeader) {
+              window.activateSearchForHeader(th);
             }
-            
-            // Show clear button if we have a value
-            if (clearButton) {
-              clearButton.style.display = searchInput.value ? 'block' : 'none';
-        (`Clear button displayed: ${!!searchInput.value}`);
-            }
-            
-            // Setup input event with debounce
-            const handleColumnSearch = debounce((event) => {
-              const searchValue = event.target.value.trim();
-              
-              // Update state
-              state.columnSearches[columnInfo.stateKey] = searchValue;
-              
-              // Apply filter to query entire database
-              applyColumnFilters(state.columnSearches);
-            }, 350); // Slightly longer debounce for better UX
-            
-            searchInput.addEventListener('input', (event) => {
-              // Show/hide clear button based on input value immediately (no debounce)
-              if (clearButton) {
-                clearButton.style.display = event.target.value ? 'block' : 'none';
-              }
-              
-              // Call the debounced handler
-              handleColumnSearch(event);
-            });
-            
-            // Focus the input
-            searchInput.focus();
-          } else {
-      (`Toggle existing search input for column ${columnInfo.name}`);
-            // Toggle input visibility
-            const isVisible = searchInput.style.display !== 'none';
-            searchInput.style.display = isVisible ? 'none' : 'block';
-            
-            // Toggle clear button based on input value
-            if (clearButton) {
-              clearButton.style.display = isVisible ? 'none' : (searchInput.value ? 'block' : 'none');
-            }
-            
-            if (!isVisible) searchInput.focus();
           }
         });
       });
@@ -1613,17 +1557,22 @@
           e.preventDefault();
           e.stopPropagation();
           
-    (`Clear button clicked for column: ${columnInfo.name}`);
+          // Use the existing implementation for clear functionality
+          const th = headerCell;
           
-          const searchInput = headerCell.querySelector('.column-search-input, .th-search');
-          if (searchInput) {
-            searchInput.value = '';
-            button.style.display = 'none';
-            
+          // Call the existing clearColumnFilter function
+          if (typeof clearColumnFilter === 'function') {
+            clearColumnFilter(th);
+          } else {
+            // Fallback if the function doesn't exist
             // Clear this column's filter in state
-      (`Clearing filter for column ${columnInfo.name} (${columnInfo.stateKey})`);
             state.columnSearches[columnInfo.stateKey] = '';
             applyColumnFilters(state.columnSearches);
+            
+            // Call the existing clear functionality if it exists
+            if (window.clearColumnFilter) {
+              window.clearColumnFilter(th);
+            }
           }
         });
       });
@@ -1631,8 +1580,8 @@
       // Check for existing search inputs and restore their values
       document.querySelectorAll('.th-search, .column-search-input').forEach((input) => {
         const headerCell = input.closest('.table_header');
-        if (!headerCell) return;
-        
+          if (!headerCell) return;
+          
         // Get column info from our mapping
         const columnInfo = headerMapping.get(headerCell);
         if (!columnInfo) return;
@@ -1682,7 +1631,16 @@
             conditions.push(`${formattedField}.ilike.${filterValue}`);
             
       (`Added filter for ${dbField}: ${value.trim()} (formatted as: ${formattedField}.ilike.${filterValue})`);
+            
+            // Special debugging for Group column
+            if (key === 'group') {
+      (`Group column search - key: ${key}, value: "${value.trim()}", dbField: ${dbField}, formattedField: ${formattedField}`);
+            }
+          } else {
+      (`No database field mapping found for key: ${key}`);
           }
+        } else {
+      (`Empty or whitespace value for key: ${key}, value: "${value}"`);
         }
       });
       
@@ -2257,7 +2215,7 @@
         
         const emptyCell = document.createElement('td');
         emptyCell.className = 'bal-table-saved-td';
-        emptyCell.colSpan = 3;
+        emptyCell.colSpan = 4; // Updated to 4 columns
         emptyCell.textContent = 'No saved activities';
         emptyCell.style.textAlign = 'center';
         emptyCell.style.padding = '20px';
@@ -2372,6 +2330,12 @@
           nameDiv.appendChild(iconsDiv);
           nameCell.appendChild(nameDiv);
           row.appendChild(nameCell);
+          
+          // Code column
+          const codeCell = document.createElement('td');
+          codeCell.className = 'bal-table-saved-td';
+          codeCell.textContent = item.Code || '';
+          row.appendChild(codeCell);
           
           // Store activity code for reference
           row.dataset.activityCode = item.Code;
@@ -2748,6 +2712,37 @@
         // Re-initialize search functionality
         setupSearch();
         
+        // Set up clear all saved items button
+        const clearAllBtn = document.querySelector('.clear-save-btn');
+        if (clearAllBtn) {
+  ("Clear all button found, setting up event listener");
+          clearAllBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Clear all saved items
+            saveSavedActivities([]);
+            
+            // Update the saved items table
+            renderSavedItems();
+            
+            // Update all main table rows to remove saved state
+            document.querySelectorAll('.table_row.is-saved').forEach(row => {
+              row.classList.remove('is-saved');
+              const saveBtn = row.querySelector('.btn-save');
+              if (saveBtn) {
+                saveBtn.classList.remove('saved');
+                const svgPath = saveBtn.querySelector('svg path');
+                if (svgPath) svgPath.setAttribute('stroke', '#6B7094');
+              }
+            });
+            
+  ("All saved items cleared");
+          });
+        } else {
+  ("Clear all button not found");
+        }
+        
         // Load initial data
   ("Loading initial data...");
         state.currentPage = 1;
@@ -2985,6 +2980,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     input.addEventListener("input", function () {
       const val = input.value.trim().toLowerCase();
+      const originalVal = input.value.trim(); // Keep original case for database search
       if (val) {
         activeFilters.set(colIndex, val);
         searchBtn.style.display = "none";
@@ -2994,7 +2990,46 @@ document.addEventListener("DOMContentLoaded", function () {
         searchBtn.style.display = "inline-block";
         clearBtn.style.display = "none";
       }
+      
+      // Apply local filters
       applyFilters();
+      
+      // Update our state for database filtering if available
+      if (window.state && window.state.columnSearches) {
+        // Get the column name from the header
+        const thText = th.querySelector('.th-text');
+        const columnName = thText ? thText.textContent.trim() : '';
+        
+        // Find the appropriate state key
+        let stateKey = '';
+        if (columnName === 'Code') stateKey = 'code';
+        else if (columnName === 'Group') stateKey = 'group';
+        else if (columnName === 'Category') stateKey = 'category';
+        else if (columnName === 'Activity Name') stateKey = 'name';
+        else if (columnName === 'Third Party') stateKey = 'thirdParty';
+        else if (columnName === 'When') stateKey = 'when';
+        else if (columnName === 'Notes') stateKey = 'notes';
+        else if (columnName === 'Risk Rating') stateKey = 'riskRating';
+        else if (columnName === 'DNFBP') stateKey = 'dnfbp';
+        
+        // Update state and apply filters if we found a matching key
+        if (stateKey && window.applyColumnFilters) {
+          // Use original case for database search, not lowercase
+          window.state.columnSearches[stateKey] = originalVal;
+          
+          // Debug logging for Group column
+          if (stateKey === 'group') {
+      (`Group column search activated - columnName: "${columnName}", stateKey: ${stateKey}, value: "${originalVal}"`);
+          }
+          
+          window.applyColumnFilters(window.state.columnSearches);
+        } else {
+          // Debug logging for unmapped columns
+          if (columnName === 'Group') {
+      (`Group column not mapped - columnName: "${columnName}", stateKey: ${stateKey}`);
+          }
+        }
+      }
     });
 
     input.addEventListener("keydown", function (e) {
@@ -3005,6 +3040,22 @@ document.addEventListener("DOMContentLoaded", function () {
         applyFilters();
         e.preventDefault();
       }
+    });
+    
+    // Add blur event to auto-close when unfocused
+    input.addEventListener("blur", function(e) {
+      // Don't close if clicking on search or clear buttons
+      const relatedTarget = e.relatedTarget;
+      if (relatedTarget && 
+          (relatedTarget.classList.contains('btn-search') || 
+           relatedTarget.classList.contains('btn-clear') ||
+           relatedTarget.closest('.btn-search') || 
+           relatedTarget.closest('.btn-clear'))) {
+        return;
+      }
+      
+      // Always close the input when unfocused, regardless of content
+      clearColumnFilter(th);
     });
 
     input.focus();
@@ -3027,7 +3078,33 @@ document.addEventListener("DOMContentLoaded", function () {
     searchBtn.style.display = "inline-block";
     clearBtn.style.display = "none";
 
+    // Apply local filters
     applyFilters();
+    
+    // Update our state for database filtering if available
+    if (window.state && window.state.columnSearches) {
+      // Get the column name from the header
+      const thText = th.querySelector('.th-text');
+      const columnName = thText ? thText.textContent.trim() : '';
+      
+      // Find the appropriate state key
+      let stateKey = '';
+      if (columnName === 'Code') stateKey = 'code';
+      else if (columnName === 'Group') stateKey = 'group';
+      else if (columnName === 'Category') stateKey = 'category';
+      else if (columnName === 'Activity Name') stateKey = 'name';
+      else if (columnName === 'Third Party') stateKey = 'thirdParty';
+      else if (columnName === 'When') stateKey = 'when';
+      else if (columnName === 'Notes') stateKey = 'notes';
+      else if (columnName === 'Risk Rating') stateKey = 'riskRating';
+      else if (columnName === 'DNFBP') stateKey = 'dnfbp';
+      
+      // Update state and apply filters if we found a matching key
+      if (stateKey && window.applyColumnFilters) {
+        window.state.columnSearches[stateKey] = '';
+        window.applyColumnFilters(window.state.columnSearches);
+      }
+    }
   }
 
   // Bind search buttons
@@ -3053,9 +3130,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 //For - copy activity item
-document.addEventListener("DOMContentLoaded", function () {
-  // Tooltip helper (z-index high so it appears above modals)
+// Tooltip helper (z-index high so it appears above modals) - moved outside event handler for global access
   function showCopyTooltip(targetEl, text = "Copied!", duration = 3000) {
+  // Remove any existing tooltips with the same class
+  document.querySelectorAll('.bal-copy-tooltip').forEach(el => el.remove());
+  
     const tip = document.createElement("div");
     tip.className = "bal-copy-tooltip";
     tip.textContent = text;
@@ -3063,35 +3142,53 @@ document.addEventListener("DOMContentLoaded", function () {
     Object.assign(tip.style, {
       position: "fixed",
       zIndex: "99999",
-      padding: "6px 10px",
-      background: "rgba(0,0,0,0.8)",
+    padding: "8px 12px",
+    background: "rgba(5, 102, 51, 0.9)",
       color: "#fff",
       fontSize: "12px",
-      lineHeight: "1",
+    lineHeight: "1.2",
       borderRadius: "6px",
       boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
       pointerEvents: "none",
       opacity: "0",
       transform: "translate(-50%, -6px)",
-      transition: "opacity 150ms ease"
+    transition: "opacity 150ms ease",
+    whiteSpace: "nowrap",
+    maxWidth: "300px",
+    textOverflow: "ellipsis",
+    overflow: "hidden"
     });
 
     document.body.appendChild(tip);
 
     const r = targetEl.getBoundingClientRect();
-    const top = Math.max(8, r.top - 10);
+  
+  // Position above the element with some offset
+  const top = Math.max(8, r.top - 30);
     const left = r.left + r.width / 2;
 
     tip.style.top = `${top}px`;
     tip.style.left = `${left}px`;
 
-    requestAnimationFrame(() => { tip.style.opacity = "1"; });
+  // Make sure the tooltip is visible
+  requestAnimationFrame(() => { 
+    tip.style.opacity = "1"; 
+    
+    // Adjust position if tooltip is too wide
+    const tipRect = tip.getBoundingClientRect();
+    if (tipRect.width > 300) {
+      tip.style.whiteSpace = "normal";
+      tip.style.maxWidth = "300px";
+    }
+  });
 
     setTimeout(() => {
       tip.style.opacity = "0";
       setTimeout(() => tip.remove(), 180);
     }, duration);
   }
+
+document.addEventListener("DOMContentLoaded", function () {
 
   // Clean text extractor (prefers .td-text, strips UI)
   function getCellCleanText(td) {
@@ -3138,6 +3235,10 @@ document.addEventListener("DOMContentLoaded", function () {
   function setupCopyButtonHover() {
     const tables = document.querySelectorAll('table.table_component, #bal-table, .bal-table-saved');
     
+    // Track active tooltip to avoid duplicates
+    let activeTooltipTimer = null;
+    let activeTooltipElement = null;
+    
     tables.forEach(table => {
       // Use event delegation for better performance with dynamically added elements
       table.addEventListener('mouseover', function(e) {
@@ -3152,8 +3253,21 @@ document.addEventListener("DOMContentLoaded", function () {
         if (row) {
           const activityName = getActivityName(row);
           if (activityName) {
-            copyBtn.setAttribute('title', `Copy: ${activityName}`);
+            // Store activity name in dataset for copy function
             copyBtn.dataset.activityName = activityName;
+            
+            // Clear any existing tooltip timer
+            if (activeTooltipTimer) {
+              clearTimeout(activeTooltipTimer);
+              activeTooltipTimer = null;
+            }
+            
+            // Show tooltip after a small delay to avoid flicker on quick mouse movements
+            activeTooltipTimer = setTimeout(() => {
+              // Show tooltip with custom message
+              showCopyTooltip(copyBtn, `Click to copy: ${activityName.substring(0, 30)}${activityName.length > 30 ? '...' : ''}`, 1500);
+              activeTooltipElement = copyBtn;
+            }, 300);
           }
         }
       });
@@ -3164,6 +3278,12 @@ document.addEventListener("DOMContentLoaded", function () {
         
         // Remove hover class
         copyBtn.classList.remove('hover');
+        
+        // Clear tooltip timer if it exists
+        if (activeTooltipTimer) {
+          clearTimeout(activeTooltipTimer);
+          activeTooltipTimer = null;
+        }
       });
     });
   }
@@ -3220,44 +3340,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Copy the text to clipboard
     navigator.clipboard.writeText(textToCopy).then(() => {
-      showCopyTooltip(btn, "Copied!", 3000);
+      // Show the tooltip with simple "Copied!" message
+      showCopyTooltip(btn, "Copied!", 2000);
       
-      // Create a temporary checkmark icon for visual feedback
-      const checkmark = document.createElement('div');
-      checkmark.className = 'copy-success-indicator';
-      checkmark.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#056633" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      `;
-      
-      // Style the checkmark
-      Object.assign(checkmark.style, {
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        backgroundColor: 'white',
-        borderRadius: '50%',
-        padding: '2px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-        zIndex: '9999',
-        animation: 'fadeInOut 1.5s ease-in-out'
-      });
-      
-      // Create and inject animation
+      // Create and inject animation CSS if it doesn't exist
       if (!document.getElementById('copy-animation-style')) {
         const style = document.createElement('style');
         style.id = 'copy-animation-style';
         style.textContent = `
-          @keyframes fadeInOut {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-            40% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            80% { opacity: 1; }
-            100% { opacity: 0; }
-          }
-          
           @keyframes pulse {
             0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(5, 102, 51, 0.7); }
             50% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(5, 102, 51, 0); }
@@ -3267,23 +3357,25 @@ document.addEventListener("DOMContentLoaded", function () {
           .btn-copy-success {
             animation: pulse 0.8s ease-in-out;
           }
+          
+          .btn-copy.hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            transition: all 0.2s ease;
+          }
+          
+          .bal-copy-tooltip {
+            font-weight: 500 !important;
+            font-size: 12px !important;
+          }
         `;
         document.head.appendChild(style);
       }
       
-      // Position relative to the button
-      btn.style.position = 'relative';
-      
-      // Add to DOM and remove after animation
-      btn.appendChild(checkmark);
-      setTimeout(() => {
-        checkmark.remove();
-      }, 1500);
-      
       // Add pulse animation to button
       btn.classList.add('btn-copy-success');
       
-      // Also change button color temporarily
+      // Change button color temporarily for visual feedback
       const originalColor = btn.style.color;
       btn.style.color = '#056633'; // Success color
       
