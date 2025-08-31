@@ -723,29 +723,63 @@
     (`Processing filter part ${index}: "${filter}"`);
           
           // Check if it's a simple filter or an OR condition
-          if (filter.includes('.ilike.') && !filter.includes(',')) {
-            // Simple filter
-            const [field, value] = filter.split('.ilike.');
-      (`Adding ilike filter: field="${field}", value="${value}"`);
+          if ((filter.includes('.ilike.') || filter.includes('.eq.')) && !filter.includes(',')) {
+            // Simple filter - determine operator type
+            let operator, field, value;
+            if (filter.includes('.ilike.')) {
+              [field, value] = filter.split('.ilike.');
+              operator = 'ilike';
+            } else if (filter.includes('.eq.')) {
+              [field, value] = filter.split('.eq.');
+              operator = 'eq';
+            }
+            
+      (`Adding ${operator} filter: field="${field}", value="${value}"`);
             
             try {
+              // For ilike filters, decode the value in case it was double-encoded
+              let processedValue = value;
+              if (operator === 'ilike') {
+                try {
+                  // If the value contains encoded characters, decode them
+                  if (value.includes('%25')) {
+                    processedValue = decodeURIComponent(value);
+                  }
+                } catch (decodeError) {
+                  // If decoding fails, use the original value
+                  processedValue = value;
+                }
+              }
+              
               // Handle quoted field names properly
               if (field.startsWith('"') && field.endsWith('"')) {
                 // Field name is already quoted
-            query = query.ilike(field, value);
-          (`Applied ilike filter with quoted field: ${field}`);
+                if (operator === 'ilike') {
+                  query = query.ilike(field, processedValue);
+                } else {
+                  query = query.eq(field, processedValue);
+                }
+          (`Applied ${operator} filter with quoted field: ${field}, value: ${processedValue}`);
               } else if (field.includes(' ')) {
                 // Field name contains spaces but is not quoted
                 const quotedField = `"${field}"`;
-                query = query.ilike(quotedField, value);
-          (`Applied ilike filter with auto-quoted field: ${quotedField}`);
+                if (operator === 'ilike') {
+                  query = query.ilike(quotedField, processedValue);
+                } else {
+                  query = query.eq(quotedField, processedValue);
+                }
+          (`Applied ${operator} filter with auto-quoted field: ${quotedField}, value: ${processedValue}`);
               } else {
                 // Normal field name
-                query = query.ilike(field, value);
-          (`Applied ilike filter with regular field: ${field}`);
+                if (operator === 'ilike') {
+                  query = query.ilike(field, processedValue);
+                } else {
+                  query = query.eq(field, processedValue);
+                }
+          (`Applied ${operator} filter with regular field: ${field}, value: ${processedValue}`);
               }
             } catch (filterError) {
-              // console.error(`Error applying ilike filter for "${field}":`, filterError);
+              // console.error(`Error applying ${operator} filter for "${field}":`, filterError);
             }
           } else if (filter.includes(',')) {
             // OR condition
@@ -1618,6 +1652,9 @@
         dnfbp: 'DNFBP'
       };
       
+      // Define which columns are numeric and should use exact matching instead of ilike
+      const numericColumns = new Set(['Group']);
+      
       // Add conditions for each column with a search term
       Object.entries(columnSearches).forEach(([key, value]) => {
         if (value && value.trim()) {
@@ -1626,15 +1663,24 @@
             // Use quotes for column names with spaces
             const formattedField = dbField.includes(' ') ? `"${dbField}"` : dbField;
             
-            // Create a properly formatted filter string for Supabase
-            const filterValue = `%${value.trim()}%`;
-            conditions.push(`${formattedField}.ilike.${filterValue}`);
-            
-      (`Added filter for ${dbField}: ${value.trim()} (formatted as: ${formattedField}.ilike.${filterValue})`);
+            // Check if this is a numeric column that should use exact matching
+            if (numericColumns.has(dbField)) {
+              // For numeric columns, use exact equality
+              const searchValue = value.trim();
+              conditions.push(`${formattedField}.eq.${searchValue}`);
+              
+      (`Added exact filter for numeric ${dbField}: ${searchValue} (formatted as: ${formattedField}.eq.${searchValue})`);
+            } else {
+              // For text columns, use ilike with wildcards
+              const filterValue = `%${value.trim()}%`;
+              conditions.push(`${formattedField}.ilike.${filterValue}`);
+              
+      (`Added ilike filter for text ${dbField}: ${value.trim()} (formatted as: ${formattedField}.ilike.${filterValue})`);
+            }
             
             // Special debugging for Group column
             if (key === 'group') {
-      (`Group column search - key: ${key}, value: "${value.trim()}", dbField: ${dbField}, formattedField: ${formattedField}`);
+      (`Group column search - key: ${key}, value: "${value.trim()}", dbField: ${dbField}, formattedField: ${formattedField}, isNumeric: ${numericColumns.has(dbField)}`);
             }
           } else {
       (`No database field mapping found for key: ${key}`);
@@ -3098,7 +3144,6 @@ document.addEventListener("DOMContentLoaded", function () {
       else if (columnName === 'Notes') stateKey = 'notes';
       else if (columnName === 'Risk Rating') stateKey = 'riskRating';
       else if (columnName === 'DNFBP') stateKey = 'dnfbp';
-      
       // Update state and apply filters if we found a matching key
       if (stateKey && window.applyColumnFilters) {
         window.state.columnSearches[stateKey] = '';
