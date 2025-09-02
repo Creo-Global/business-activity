@@ -37,7 +37,6 @@
       selectedThirdParties: [], // Array of selected third party filters
     };
     
-    // Expose state to window for direct access from event handlers
     window.state = state;
     window.applyColumnFilters = applyColumnFilters;
   
@@ -3100,19 +3099,21 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
       
-      // Always close the input when unfocused, regardless of content
-      clearColumnFilter(th);
+      // If there's a value, preserve the filter and keep the input visible
+      if (input.value.trim()) {
+        activeFilters.set(colIndex, input.value.trim());
+        applyFilters();
+        // Keep the input visible so user can see and edit the filter
+      } else {
+        // If no value, clear the filter completely
+        clearColumnFilter(th);
+      }
     });
 
     input.focus();
   }
 
-  function clearColumnFilter(th) {
-    const colIndex = headerCells.indexOf(th);
-    if (colIndex < 0) return;
-
-    activeFilters.delete(colIndex);
-
+  function hideSearchInput(th) {
     const container = th.querySelector(".bal-table-td-div") || th;
     const input = container.querySelector("input.th-search");
     const label = container.querySelector(".th-text");
@@ -3123,6 +3124,15 @@ document.addEventListener("DOMContentLoaded", function () {
     if (label) label.style.display = "";
     searchBtn.style.display = "inline-block";
     clearBtn.style.display = "none";
+  }
+
+  function clearColumnFilter(th) {
+    const colIndex = headerCells.indexOf(th);
+    if (colIndex < 0) return;
+
+    activeFilters.delete(colIndex);
+
+    hideSearchInput(th);
 
     // Apply local filters
     applyFilters();
