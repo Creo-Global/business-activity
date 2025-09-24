@@ -32,9 +32,15 @@
       currentGroup: '',
       searchTerm: '',
       columnFilters: '',
-      savedItems: [], // Array to store saved/bookmarked items
+      savedItems: [], 
       thirdPartyApproval: false, // Toggle for third party approval filter
-      selectedThirdParties: [], // Array of selected third party filters
+      selectedThirdParties: new Set(), // Set of selected third party filters
+      // Multi-select state for mobile filters
+      selectedGroups: new Set(),
+      selectedCategories: new Set(),
+      selectedCodes: new Set(),
+      codeSortOrder: 'ascending', // 'ascending' or 'descending'
+      fawriMode: false, // Toggle for FAWRI Activities (Low and Medium risk only)
     };
     
     window.state = state;
@@ -68,11 +74,15 @@
     const dom = {
       tableEl: document.querySelector('table.table_component, #bal-table'),
       tableBodyEl: document.querySelector('table.table_component tbody.table_body, #bal-table .table_body'),
+      // Mobile container elements
+      mobileListEl: document.querySelector('.bal-mobile-list, .mobile-activities-container'),
       categoryContainers: document.querySelectorAll('.bal-category-lists'),
       categoryItems: document.querySelectorAll('.bal-cat-item'),
       // Main search elements
       searchForm: document.querySelector('#wf-form-searchInput, form[name="wf-form-searchInput"]'),
       searchEl: document.querySelector('#search-input, .bal-search-input, input[type="search"], #global-search, .search-input'),
+      // Multiple search inputs (for desktop and mobile)
+      searchInputs: document.querySelectorAll('#search-input, .bal-search-input, input[name="searchInput"], .main-search input[type="text"]'),
       searchSubmitBtn: document.querySelector('.bal-search-submit, .bal-search svg, .bal-search-submit svg'),
       // Column search elements
       activeGroupSpan: document.querySelector('.active-group'),
@@ -83,10 +93,39 @@
       clearButtons: document.querySelectorAll('.btn-clear'),
       categoryTab: document.querySelector('[data-w-tab="Tab 1"]'),
       groupTab: document.querySelector('[data-w-tab="Tab 2"]'),
+      // FAWRI Activities toggle elements (Desktop)
+      fawriToggleWrapper: document.querySelector('.bal-tab-desktop-nav'),
+      regularActivitiesTab: document.querySelector('.bla-tab-nav-click:first-child'),
+      fawriActivitiesTab: document.querySelector('.bla-tab-nav-click:last-child'),
+      // FAWRI Activities toggle elements (Mobile)
+      mobileFawriToggleWrapper: document.querySelector('.bal-swich-tab'),
+      mobileRegularActivitiesTab: document.querySelector('.bal-tab-click:first-child'),
+      mobileFawriActivitiesTab: document.querySelector('.bal-tab-click:last-child'),
+      // Mobile sorting/filtering tabs
+      mobileSortingTabs: document.querySelector('.fiter-by-tab.w-tabs'),
+      mobileGroupTab: document.querySelector('.fiter-by-tab [data-w-tab="Tab 1"]'),
+      mobileCategoriesTab: document.querySelector('.fiter-by-tab [data-w-tab="Tab 2"]'),
+      mobileCodeTab: document.querySelector('.fiter-by-tab [data-w-tab="Tab 3"]'),
+      // Mobile sorting modal triggers (tabs that open modals)
+      mobileGroupModal: document.querySelector('[data-modal="group"]'),
+      mobileCategoriesModal: document.querySelector('[data-modal="categories"]'),
+      mobileCodeModal: document.querySelector('[data-modal="code"]'),
+      // Existing mobile filter modals
+      mobileFilterModals: document.querySelectorAll('.filter-slide-wrap'),
+      mobileGroupFilterModal: document.querySelector('[data-id="group"]'),
+      mobileCategoriesFilterModal: document.querySelector('[data-id="categories"], [data-id="category"]'),
+      mobileCodeFilterModal: document.querySelector('[data-id="code"]'),
+      mobileThirdPartyFilterModal: document.querySelector('[data-id="thirdparty"]'),
+      mobileGroupCheckboxContainer: null, // Will be populated dynamically
+      mobileCategoriesCheckboxContainer: null, // Will be populated dynamically
+      mobileCodeCheckboxContainer: null, // Will be populated dynamically
+      mobileThirdPartyCheckboxContainer: null, // Will be populated dynamically
       // Saved items table elements
       savedTable: document.querySelector('.bal-table-saved, #saved_list_table'),
       savedTableBody: document.querySelector('.bal-table-saved-tbody, #saved_list_table tbody, .bal-table-saved tbody'),
       savedItemsCount: document.querySelectorAll('.saved-items-count, .saved-count'),
+      // Mobile saved items container
+      savedMobileContainer: document.querySelector('.bal-wrapper.for-mobile.saaved-items, .bal-wrapper.for-mobile.saved-items'),
       // Third party approval elements
       thirdPartyToggle: document.querySelector('#select_all'),
       thirdPartyDropdown: document.querySelector('.third-party-approval'),
@@ -96,6 +135,265 @@
     };
   
         // ─── Utility Functions ─────────────────────────────────────────
+
+    function isMobileView() {
+      return window.innerWidth <= 992; // Consider mobile for screens 992px and below
+    }
+
+    function createMobileItem(item) {
+      // Create the main wrapper
+      const balWrapper = document.createElement('div');
+      balWrapper.className = 'bal-wrapper';
+      
+      // Create the table row container
+      const balItem = document.createElement('div');
+      balItem.className = 'bal-item table_row';
+      balItem.dataset.activityCode = item.Code;
+      balItem.dataset.activityData = JSON.stringify(item);
+      
+      // Create the group section
+      const balItemGroup = document.createElement('div');
+      balItemGroup.className = 'bal-item-group';
+      
+      const groupNumber = document.createElement('div');
+      groupNumber.className = 'bal-group-number';
+      groupNumber.textContent = item.Group || '';
+      
+      const groupText = document.createElement('div');
+      groupText.className = 'text-block-352';
+      groupText.textContent = 'Group';
+      
+      balItemGroup.appendChild(groupNumber);
+      balItemGroup.appendChild(groupText);
+      
+      // Create the name section
+      const balItemName = document.createElement('div');
+      balItemName.className = 'bal-item-name';
+      
+      const baName = document.createElement('p');
+      baName.className = 'ba-name';
+      baName.textContent = item['Activity Name'] || '';
+      
+      const baLabels = document.createElement('div');
+      baLabels.className = 'ba-labels';
+      
+      // Add DNFBP label if exists
+      if (item.DNFBP) {
+        const dnfbpLabel = document.createElement('div');
+        dnfbpLabel.className = 'ba-label';
+        dnfbpLabel.textContent = 'DNFBP';
+        baLabels.appendChild(dnfbpLabel);
+      }
+      
+      // Add third party approval label if exists
+      if (item['Third Party'] && item['Third Party'] !== 'N/A') {
+        const approvalLabel = document.createElement('div');
+        approvalLabel.className = 'ba-label';
+        approvalLabel.textContent = 'pre approval';
+        baLabels.appendChild(approvalLabel);
+      }
+      
+      balItemName.appendChild(baName);
+      balItemName.appendChild(baLabels);
+      
+      // Create the code section
+      const balItemCode = document.createElement('div');
+      balItemCode.className = 'bal-item-code';
+      
+      const codeNumber = document.createElement('div');
+      codeNumber.className = 'bal-group-number';
+      codeNumber.textContent = item.Code || '';
+      
+      const codeText = document.createElement('div');
+      codeText.className = 'text-block-352';
+      codeText.textContent = 'Code';
+      
+      balItemCode.appendChild(codeNumber);
+      balItemCode.appendChild(codeText);
+      
+      // Create the save section
+      const balItemSave = document.createElement('div');
+      balItemSave.className = 'bal-item-save';
+      
+      const codeEmbed = document.createElement('div');
+      codeEmbed.className = 'code-embed-150 w-embed';
+      
+      const saveButton = document.createElement('button');
+      saveButton.type = 'submit';
+      saveButton.className = 'btn-save';
+      saveButton.setAttribute('aria-label', 'Save');
+      saveButton.innerHTML = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.49902 1.05273L8.69727 1.0625C9.15499 1.10845 9.58495 1.31153 9.91309 1.63965C10.2412 1.96777 10.4443 2.39776 10.4902 2.85547L10.5 3.05371V10.9482C10.5022 11.1444 10.4455 11.3367 10.3369 11.5C10.2281 11.6635 10.0717 11.7906 9.88965 11.8643L9.88477 11.8662C9.76055 11.9183 9.62686 11.9448 9.49219 11.9453C9.36339 11.9449 9.23598 11.9199 9.11719 11.8701C8.99793 11.8201 8.88961 11.7464 8.79883 11.6543L8.79492 11.6514L5.85254 8.72461L5.5 8.37402L5.14746 8.72461L2.20508 11.6514L2.20117 11.6553C2.06351 11.795 1.88679 11.8897 1.69434 11.9277C1.54982 11.9562 1.40114 11.9517 1.25977 11.915L1.12109 11.8682L1.11133 11.8643L0.980469 11.7988C0.854533 11.7245 0.745917 11.6227 0.664062 11.5C0.555089 11.3366 0.497867 11.1437 0.5 10.9473V3.05371C0.500635 2.52333 0.711894 2.01469 1.08691 1.63965C1.41502 1.31155 1.84505 1.10849 2.30273 1.0625L2.50098 1.05273H8.49902Z" stroke="#6B7094"/>
+      </svg>`;
+      
+      // Add save functionality
+      saveButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleSavedItem(item, saveButton, balItem);
+      });
+      
+      // Check if item is already saved
+      if (isItemSaved(item.Code)) {
+        saveButton.classList.add('saved');
+        saveButton.querySelector('svg path').setAttribute('stroke', '#06603A');
+        balItem.classList.add('is-saved');
+      }
+      
+      // Add styles for save button
+      const style = document.createElement('style');
+      style.textContent = '.btn-save { background-color: transparent; }';
+      codeEmbed.appendChild(saveButton);
+      codeEmbed.appendChild(style);
+      
+      balItemSave.appendChild(codeEmbed);
+      
+      // Assemble the item
+      balItem.appendChild(balItemGroup);
+      balItem.appendChild(balItemName);
+      balItem.appendChild(balItemCode);
+      balItem.appendChild(balItemSave);
+      
+      // Add click event to show modal
+      balItem.style.cursor = 'pointer';
+      balItem.addEventListener('click', (event) => {
+        event.stopPropagation();
+        showActivityDetailsModal(item);
+      });
+      
+      balWrapper.appendChild(balItem);
+      return balWrapper;
+    }
+
+    function createMobileSavedItem(item) {
+      // Create the table row container for saved items (no wrapper div needed as it goes inside existing wrapper)
+      const balItem = document.createElement('div');
+      balItem.className = 'bal-item table_row';
+      balItem.dataset.activityCode = item.Code;
+      balItem.dataset.activityData = JSON.stringify(item);
+      
+      // Create the group section
+      const balItemGroup = document.createElement('div');
+      balItemGroup.className = 'bal-item-group';
+      
+      const groupNumber = document.createElement('div');
+      groupNumber.className = 'bal-group-number';
+      groupNumber.textContent = item.Group || '';
+      
+      const groupText = document.createElement('div');
+      groupText.className = 'text-block-352';
+      groupText.textContent = 'Group';
+      
+      balItemGroup.appendChild(groupNumber);
+      balItemGroup.appendChild(groupText);
+      
+      // Create the name section
+      const balItemName = document.createElement('div');
+      balItemName.className = 'bal-item-name';
+      
+      const baName = document.createElement('p');
+      baName.className = 'ba-name';
+      baName.textContent = item['Activity Name'] || '';
+      
+      const baLabels = document.createElement('div');
+      baLabels.className = 'ba-labels';
+      
+      // Add DNFBP label if exists
+      if (item.DNFBP) {
+        const dnfbpLabel = document.createElement('div');
+        dnfbpLabel.className = 'ba-label';
+        dnfbpLabel.textContent = 'DNFBP';
+        baLabels.appendChild(dnfbpLabel);
+      }
+      
+      // Add third party approval label if exists
+      if (item['Third Party'] && item['Third Party'] !== 'N/A') {
+        const approvalLabel = document.createElement('div');
+        approvalLabel.className = 'ba-label';
+        approvalLabel.textContent = 'pre approval';
+        baLabels.appendChild(approvalLabel);
+      }
+      
+      balItemName.appendChild(baName);
+      balItemName.appendChild(baLabels);
+      
+      // Create the code section
+      const balItemCode = document.createElement('div');
+      balItemCode.className = 'bal-item-code';
+      
+      const codeNumber = document.createElement('div');
+      codeNumber.className = 'bal-group-number';
+      codeNumber.textContent = item.Code || '';
+      
+      const codeText = document.createElement('div');
+      codeText.className = 'text-block-352';
+      codeText.textContent = 'Code';
+      
+      balItemCode.appendChild(codeNumber);
+      balItemCode.appendChild(codeText);
+      
+      // Create the save section (remove button for saved items)
+      const balItemSave = document.createElement('div');
+      balItemSave.className = 'bal-item-save';
+      
+      const codeEmbed = document.createElement('div');
+      codeEmbed.className = 'code-embed-150 w-embed';
+      
+      const removeButton = document.createElement('button');
+      removeButton.type = 'submit';
+      removeButton.className = 'btn-save saved';
+      removeButton.setAttribute('aria-label', 'Remove');
+      removeButton.innerHTML = `<svg width="11" height="13" viewBox="0 0 11 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 12L5.5 9L1 12V1C1 0.734784 1.10536 0.48043 1.29289 0.292893C1.48043 0.105357 1.73478 0 2 0H9C9.26522 0 9.51957 0.105357 9.70711 0.292893C9.89464 0.48043 10 0.734784 10 1V12Z" stroke="#056633" fill="#056633" fill-opacity="1" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+      
+      // Add remove functionality
+      removeButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        
+        // Remove from saved items
+        const savedActivities = getSavedActivities();
+        const updatedSaved = savedActivities.filter(act => act.Code !== item.Code);
+        saveSavedActivities(updatedSaved);
+        
+        // Update saved items display
+        renderSavedItems();
+        
+        // Update main table if the item is visible there
+        const mainTableRow = document.querySelector(`.table_row[data-activity-code="${item.Code}"]`);
+        if (mainTableRow) {
+          mainTableRow.classList.remove('is-saved');
+          const saveBtn = mainTableRow.querySelector('.btn-save');
+          if (saveBtn) {
+            saveBtn.classList.remove('saved');
+            const svgPath = saveBtn.querySelector('svg path');
+            if (svgPath) svgPath.setAttribute('stroke', '#6B7094');
+          }
+        }
+      });
+      
+      // Add styles for remove button
+      const style = document.createElement('style');
+      style.textContent = '.btn-save { background-color: transparent; }';
+      codeEmbed.appendChild(removeButton);
+      codeEmbed.appendChild(style);
+      
+      balItemSave.appendChild(codeEmbed);
+      
+      // Assemble the item
+      balItem.appendChild(balItemGroup);
+      balItem.appendChild(balItemName);
+      balItem.appendChild(balItemCode);
+      balItem.appendChild(balItemSave);
+      
+      // Add click event to show modal
+      balItem.style.cursor = 'pointer';
+      balItem.addEventListener('click', (event) => {
+        event.stopPropagation();
+        showActivityDetailsModal(item);
+      });
+      
+      return balItem;
+    }
 
     function createLoader() {
       const loaderContainer = document.createElement('div');
@@ -109,64 +407,16 @@
       return loaderContainer;
     }
 
-    function closeAccordionOnMobile() {
-      // Only close accordion on iPad and smaller devices (768px and below)
-      if (window.innerWidth > 820) return;
-      
-      const accordionWrapper = document.querySelector('.f-accordian-wrapper.activity');
-      if (!accordionWrapper) return;
-      
-      const dropdown = accordionWrapper.querySelector('.f-accordian-dropdown');
-      const toggle = accordionWrapper.querySelector('.f-accordian-toggle');
-      const list = accordionWrapper.querySelector('.f-accordian-list');
-      const icon = accordionWrapper.querySelector('.f-accordian-icon');
-      
-      if (!dropdown || !toggle || !list) return;
-      
-      // Get current height before starting animation
-      const currentHeight = list.scrollHeight;
-      
-      // Ensure list has transition for smooth animation
-      list.style.transition = 'height 0.3s ease, opacity 0.3s ease';
-      list.style.overflow = 'hidden';
-      
-      // Set initial height to current height to enable transition
-      list.style.height = currentHeight + 'px';
-      
-      // Force a reflow to ensure the height is set
-      list.offsetHeight;
-      
-      // Start the closing animation
-      requestAnimationFrame(() => {
-        // Animate list closing
-        list.style.height = '0px';
-        list.style.opacity = '0.5';
-        
-        // Animate icon rotation with smooth transition
-        if (icon) {
-          icon.style.transition = 'transform 0.3s ease, color 0.3s ease';
-          icon.style.transform = 'translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(0deg) skew(0deg, 0deg)';
-          icon.style.color = 'rgb(107, 112, 148)'; // Reset to closed state color
-        }
-      });
-      
-      // After animation completes, clean up classes and attributes
-      setTimeout(() => {
-        dropdown.classList.remove('w--open');
-        toggle.classList.remove('w--open');
-        list.classList.remove('w--open');
-        
-        // Update ARIA attributes
-        toggle.setAttribute('aria-expanded', 'false');
-        
-        // Reset opacity and remove transition to match Webflow behavior
-        list.style.opacity = '';
-        list.style.transition = '';
-        list.style.overflow = '';
-      }, 300); // Match transition duration
-    }
   
     function showLoader() {
+      if (isMobileView() && dom.mobileListEl) {
+        // Mobile view - show loader in mobile container
+        const existingLoader = dom.mobileListEl.querySelector('.loader-container');
+        if (existingLoader) existingLoader.remove();
+        dom.mobileListEl.innerHTML = '';
+        dom.mobileListEl.appendChild(createLoader());
+      } else if (dom.tableBodyEl) {
+        // Desktop view - show loader in table
       const existingLoader = dom.tableBodyEl.querySelector('.loader-container');
       if (existingLoader) existingLoader.remove();
       dom.tableBodyEl.innerHTML = '';
@@ -181,14 +431,22 @@
       loaderRow.appendChild(loaderCell);
       
       dom.tableBodyEl.appendChild(loaderRow);
+      }
     }
   
     function hideLoader() {
+      if (isMobileView() && dom.mobileListEl) {
+        // Mobile view - remove loader from mobile container
+        const loader = dom.mobileListEl.querySelector('.loader-container');
+        if (loader) loader.remove();
+      } else if (dom.tableBodyEl) {
+        // Desktop view - remove loader from table
       const loaderRow = dom.tableBodyEl.querySelector('.loader-container');
       if (loaderRow) {
         const parentRow = loaderRow.closest('tr');
         if (parentRow) parentRow.remove();
         else loaderRow.remove();
+        }
       }
     }
   
@@ -199,12 +457,1058 @@
       }
     }
 
-    function updateAccordionTitle() {
-      const accordionTitle = document.querySelector('.f-accordian-title');
-      if (accordionTitle) {
-        const displayText = state.currentCategory || 'All Categories';
-        accordionTitle.textContent = displayText;
+    // ─── Mobile Sorting/Filtering Logic ─────────────────────────────
+
+    async function initMobileSorting() {
+      console.log("Initializing mobile sorting...");
+      
+      if (!dom.mobileSortingTabs) {
+        console.log("Mobile sorting tabs not found");
+        return;
       }
+      
+      try {
+        // Fetch categories and groups from database
+        const { data, error } = await supabase.from('Activity List').select('Category, Group, Code');
+        if (error) {
+          console.error("Error fetching data for mobile sorting:", error);
+          return;
+        }
+        
+        // Extract unique values
+        const categories = Array.from(new Set(data.map(r => r.Category).filter(Boolean))).sort();
+        const groups = Array.from(new Set(data.map(r => r.Group).filter(Boolean))).sort();
+        const codes = Array.from(new Set(data.map(r => r.Code).filter(Boolean))).sort();
+        const thirdParties = Array.from(new Set(data.map(r => r['Third Party']).filter(Boolean))).sort();
+        
+        console.log(`Found ${categories.length} categories, ${groups.length} groups, ${codes.length} codes, ${thirdParties.length} third parties`);
+        
+        // Find and populate existing modal containers
+        findMobileModalContainers();
+        populateExistingModals(categories, groups, codes, thirdParties);
+        
+        // Set up mobile sorting functionality
+        setupMobileSortingTabs();
+        
+        // Set up footer buttons for all modals (with delay to ensure DOM is ready)
+        console.log("About to call setupModalFooterButtons...");
+        setTimeout(() => {
+          setupModalFooterButtons();
+        }, 500);
+        
+        // Initialize display
+        updateMobileSortingDisplay();
+        
+      } catch (error) {
+        console.error("Error in initMobileSorting:", error);
+      }
+    }
+    
+    function findMobileModalContainers() {
+      console.log("Finding mobile modal containers...");
+      
+      // Debug: log all elements with data-id attributes
+      const allDataIdElements = document.querySelectorAll('[data-id]');
+      console.log(`Found ${allDataIdElements.length} elements with data-id:`, 
+        Array.from(allDataIdElements).map(el => el.getAttribute('data-id')));
+      
+      // Look for modals with specific data-id attributes
+      const groupModal = document.querySelector('[data-id="group"]');
+      const categoriesModal = document.querySelector('[data-id="categories"]') || document.querySelector('[data-id="category"]');
+      const codeModal = document.querySelector('[data-id="code"]');
+      const thirdPartyModal = document.querySelector('[data-id="thirdparty"]');
+      
+      if (groupModal) {
+        console.log("Found group modal element:", groupModal);
+        const groupCheckboxContainer = groupModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
+        console.log("Group checkbox container:", groupCheckboxContainer);
+        if (groupCheckboxContainer) {
+          console.log("✅ Successfully found group modal with data-id='group'");
+          dom.mobileGroupCheckboxContainer = groupCheckboxContainer;
+        }
+      } else {
+        console.log("❌ No group modal found with data-id='group'");
+      }
+      
+      if (categoriesModal) {
+        console.log("Found categories modal element:", categoriesModal);
+        const categoriesCheckboxContainer = categoriesModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
+        console.log("Categories checkbox container:", categoriesCheckboxContainer);
+        if (categoriesCheckboxContainer) {
+          console.log("✅ Successfully found categories modal with data-id='categories' or 'category'");
+          dom.mobileCategoriesCheckboxContainer = categoriesCheckboxContainer;
+        }
+      } else {
+        console.log("❌ No categories modal found with data-id='categories' or 'category'");
+      }
+      
+      if (codeModal) {
+        console.log("Found code modal element:", codeModal);
+        const codeCheckboxContainer = codeModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
+        console.log("Code checkbox container:", codeCheckboxContainer);
+        if (codeCheckboxContainer) {
+          console.log("✅ Successfully found code modal with data-id='code'");
+          dom.mobileCodeCheckboxContainer = codeCheckboxContainer;
+        }
+      } else {
+        console.log("❌ No code modal found with data-id='code'");
+      }
+      
+      if (thirdPartyModal) {
+        console.log("Found third party modal element:", thirdPartyModal);
+        const thirdPartyCheckboxContainer = thirdPartyModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
+        console.log("Third party checkbox container:", thirdPartyCheckboxContainer);
+        if (thirdPartyCheckboxContainer) {
+          console.log("✅ Successfully found third party modal with data-id='thirdparty'");
+          dom.mobileThirdPartyCheckboxContainer = thirdPartyCheckboxContainer;
+        }
+      } else {
+        console.log("❌ No third party modal found with data-id='thirdparty'");
+      }
+      
+      // Fallback: if data-id approach doesn't work, use the search input placeholder method
+      if (!dom.mobileGroupCheckboxContainer || !dom.mobileCategoriesCheckboxContainer) {
+        console.log("Using fallback method to find modals...");
+        const filterModals = document.querySelectorAll('.filter-slide-wrap');
+        
+        filterModals.forEach((modal, index) => {
+          const searchInput = modal.querySelector('input[placeholder*="group"]');
+          const checkboxContainer = modal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
+          
+          if (searchInput && searchInput.placeholder.includes('group') && !dom.mobileGroupCheckboxContainer) {
+            console.log(`Found group modal at index ${index} using fallback`);
+            dom.mobileGroupCheckboxContainer = checkboxContainer;
+          } else if (checkboxContainer && !dom.mobileCategoriesCheckboxContainer) {
+            console.log(`Found categories modal at index ${index} using fallback`);
+            dom.mobileCategoriesCheckboxContainer = checkboxContainer;
+          }
+        });
+      }
+    }
+    
+    function populateExistingModals(categories, groups, codes, thirdParties) {
+      console.log("Populating existing modals with database data...");
+      
+      // Populate groups modal
+      if (dom.mobileGroupCheckboxContainer) {
+        populateCheckboxContainer(dom.mobileGroupCheckboxContainer, groups, 'group', 'Select All Groups');
+      }
+      
+      // Populate categories modal
+      if (dom.mobileCategoriesCheckboxContainer) {
+        populateCheckboxContainer(dom.mobileCategoriesCheckboxContainer, categories, 'category', 'Select All Categories');
+      }
+      
+      // Populate codes modal
+      if (dom.mobileCodeCheckboxContainer) {
+        populateCheckboxContainer(dom.mobileCodeCheckboxContainer, codes, 'code', 'Select all activities');
+      }
+      
+      // Populate third party modal (keep existing items, just add click handlers)
+      if (dom.mobileThirdPartyCheckboxContainer) {
+        setupThirdPartyCheckboxHandlers(dom.mobileThirdPartyCheckboxContainer);
+      }
+    }
+    
+    function populateCheckboxContainer(container, items, type, allText) {
+      console.log(`Populating ${type} container with ${items.length} items`);
+      
+      // Clear existing checkboxes except the first one (Select All)
+      const existingItems = container.querySelectorAll('.bal-dropdown-link.select-category');
+      existingItems.forEach((item, index) => {
+        if (index === 0) {
+          // Update the "Select All" text and data attribute
+          const label = item.querySelector('.bal-checkbox-label');
+          const input = item.querySelector('input[type="checkbox"]');
+          if (label) label.textContent = allText;
+          if (input) input.dataset.name = allText;
+        } else {
+          // Remove other existing items
+          item.remove();
+        }
+      });
+      
+      // Add new items from database
+      items.forEach((item, index) => {
+        const checkboxLink = document.createElement('div');
+        checkboxLink.className = 'bal-dropdown-link select-category';
+        
+        const checkboxField = document.createElement('label');
+        checkboxField.className = 'w-checkbox bal-checkbox-field check-list';
+        
+        const checkboxInput = document.createElement('div');
+        checkboxInput.className = 'w-checkbox-input w-checkbox-input--inputType-custom bal-checkbox';
+        
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'checkbox';
+        hiddenInput.name = `${type}-${index}`;
+        hiddenInput.id = `${type}-${index}`;
+        hiddenInput.dataset.name = item;
+        hiddenInput.style.cssText = 'opacity:0;position:absolute;z-index:-1';
+        
+        const label = document.createElement('span');
+        label.className = 'bal-checkbox-label w-form-label';
+        label.setAttribute('for', hiddenInput.id);
+        label.textContent = item;
+        
+        checkboxField.appendChild(checkboxInput);
+        checkboxField.appendChild(hiddenInput);
+        checkboxField.appendChild(label);
+        checkboxLink.appendChild(checkboxField);
+        
+        // Add click event
+        checkboxLink.addEventListener('click', () => {
+          handleMobileCheckboxSelection(type, item, hiddenInput);
+        });
+        
+        container.appendChild(checkboxLink);
+      });
+      
+      // Set up the "Select All" checkbox click handler
+      const selectAllCheckbox = container.querySelector('.bal-dropdown-link.select-category');
+      if (selectAllCheckbox) {
+        const selectAllInput = selectAllCheckbox.querySelector('input[type="checkbox"]');
+        const selectAllText = selectAllCheckbox.querySelector('.bal-checkbox-label').textContent;
+        
+        selectAllCheckbox.addEventListener('click', () => {
+          handleMobileCheckboxSelection(type, selectAllText, selectAllInput);
+        });
+      }
+    }
+    
+    function setupThirdPartyCheckboxHandlers(container) {
+      console.log("Setting up third party checkbox handlers...");
+      
+      // Add click handlers to existing third party checkboxes
+      const checkboxLinks = container.querySelectorAll('.bal-dropdown-link.select-category');
+      
+      checkboxLinks.forEach(checkboxLink => {
+        const input = checkboxLink.querySelector('input[type="checkbox"]');
+        const label = checkboxLink.querySelector('.bal-checkbox-label');
+        
+        if (input && label) {
+          const thirdPartyName = label.textContent;
+          input.dataset.name = thirdPartyName;
+          
+          checkboxLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            input.checked = !input.checked;
+            handleMobileCheckboxSelection('thirdparty', thirdPartyName, input);
+          });
+        }
+      });
+    }
+    
+    function setupModalFooterButtons() {
+      console.log("Setting up modal footer buttons...");
+      
+      // Find all modals with data-id attributes
+      const modals = document.querySelectorAll('[data-id]');
+      console.log(`Found ${modals.length} modals with data-id attributes:`, Array.from(modals).map(m => m.getAttribute('data-id')));
+      
+      modals.forEach(modal => {
+        const modalId = modal.getAttribute('data-id');
+        const footer = modal.querySelector('.filter-footer');
+        
+        console.log(`Modal ${modalId}:`, {
+          hasFooter: !!footer,
+          footer: footer
+        });
+        
+        if (footer) {
+          // Find ALL buttons in the footer, not just specific classes
+          const allButtons = footer.querySelectorAll('button, a.w-button, .btn-clear, .filter-submit');
+          const clearButtons = footer.querySelectorAll('.btn-clear');
+          const applyButtons = footer.querySelectorAll('.filter-submit:not(.btn-clear)');
+          
+          console.log(`Modal ${modalId} buttons:`, {
+            totalButtons: allButtons.length,
+            allButtonTexts: Array.from(allButtons).map(b => b.textContent.trim()),
+            clearButtons: clearButtons.length,
+            applyButtons: applyButtons.length,
+            allButtons: Array.from(allButtons)
+          });
+          
+          // Set up event listeners for all clear buttons
+          clearButtons.forEach((clearButton, index) => {
+            console.log(`Setting up clear button ${index + 1} for modal: ${modalId}`);
+            clearButton.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log(`Clear button ${index + 1} clicked for modal: ${modalId}`);
+              handleModalClearAll(modalId);
+            });
+          });
+          
+          // Set up event listeners for all apply buttons
+          applyButtons.forEach((applyButton, index) => {
+            console.log(`Setting up apply button ${index + 1} for modal: ${modalId}`);
+            applyButton.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log(`Apply button ${index + 1} clicked for modal: ${modalId}`);
+              handleModalApply(modalId);
+            });
+          });
+          
+          // Also set up listeners based on button text content (fallback)
+          allButtons.forEach((button, index) => {
+            const buttonText = button.textContent.trim().toLowerCase();
+            const isAlreadyClearButton = Array.from(clearButtons).includes(button);
+            const isAlreadyApplyButton = Array.from(applyButtons).includes(button);
+            
+            if (buttonText.includes('clear') && !isAlreadyClearButton) {
+              console.log(`Setting up clear button by text "${buttonText}" for modal: ${modalId}`);
+              button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log(`Clear button (by text) clicked for modal: ${modalId}`);
+                handleModalClearAll(modalId);
+              });
+            } else if (buttonText.includes('apply') && !isAlreadyApplyButton) {
+              console.log(`Setting up apply button by text "${buttonText}" for modal: ${modalId}`);
+              button.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log(`Apply button (by text) clicked for modal: ${modalId}`);
+                handleModalApply(modalId);
+              });
+            }
+          });
+          
+          console.log(`Set up footer buttons for modal: ${modalId}`);
+        }
+        
+        // Set up back button and close button
+        const backButton = modal.querySelector('.back-to-main');
+        const closeButton = modal.querySelector('.close-category');
+        
+        if (backButton) {
+          console.log(`Setting up back button for modal: ${modalId}`);
+          backButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`Back button clicked for modal: ${modalId}`);
+            closeFilterModal(modalId);
+          });
+        }
+        
+        if (closeButton) {
+          console.log(`Setting up close button for modal: ${modalId}`);
+          closeButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log(`Close button clicked for modal: ${modalId}`);
+            closeFilterModal(modalId);
+          });
+        }
+      });
+    }
+    
+    function handleModalClearAll(modalId) {
+      console.log(`🧹 Clear all clicked for modal: ${modalId}`);
+      
+      // Clear selections based on modal type
+      switch (modalId) {
+        case 'group':
+          console.log(`Before clear - selectedGroups:`, Array.from(state.selectedGroups));
+          state.selectedGroups.clear();
+          console.log(`After clear - selectedGroups:`, Array.from(state.selectedGroups));
+          updateMobileCheckboxStates('group');
+          break;
+        case 'categories':
+        case 'category':
+          console.log(`Before clear - selectedCategories:`, Array.from(state.selectedCategories));
+          state.selectedCategories.clear();
+          console.log(`After clear - selectedCategories:`, Array.from(state.selectedCategories));
+          updateMobileCheckboxStates('category');
+          break;
+        case 'code':
+          console.log(`Before clear - selectedCodes:`, Array.from(state.selectedCodes));
+          state.selectedCodes.clear();
+          console.log(`After clear - selectedCodes:`, Array.from(state.selectedCodes));
+          updateMobileCheckboxStates('code');
+          break;
+        case 'thirdparty':
+          console.log(`Before clear - selectedThirdParties:`, Array.from(state.selectedThirdParties));
+          state.selectedThirdParties.clear();
+          console.log(`After clear - selectedThirdParties:`, Array.from(state.selectedThirdParties));
+          updateMobileCheckboxStates('thirdparty');
+          break;
+      }
+      
+      // Update display and apply filters
+      updateMobileSortingDisplay();
+      applyMobileFilters();
+      
+      // Close the modal
+      closeFilterModal(modalId);
+    }
+    
+    function handleModalApply(modalId) {
+      console.log(`Apply clicked for modal: ${modalId}`);
+      
+      // Apply filters
+      applyMobileFilters();
+      
+      // Close the modal
+      closeFilterModal(modalId);
+    }
+    
+    function closeFilterModal(modalId) {
+      console.log(`Closing filter modal: ${modalId}`);
+      
+      // Find the modal element by data-id
+      const modal = document.querySelector(`[data-id="${modalId}"]`);
+      
+      if (modal) {
+        console.log(`Found modal to close:`, modal);
+        
+        // Try multiple approaches to close the modal
+        
+        // 1. Remove the is-open class
+        modal.classList.remove('is-open');
+        
+        // 2. Add the is-closed class
+        modal.classList.add('is-closed');
+        
+        // 3. Set display to none
+        modal.style.display = 'none';
+        
+        // 4. Set visibility to hidden
+        modal.style.visibility = 'hidden';
+        
+        // 5. Set opacity to 0
+        modal.style.opacity = '0';
+        
+        // 6. Try to find and click any close button
+        const closeButton = modal.querySelector('.close-category, .modal-close, [aria-label="Close"]');
+        if (closeButton) {
+          console.log(`Found close button, clicking it:`, closeButton);
+          closeButton.click();
+        }
+        
+        // 7. Try to find and click any back button
+        const backButton = modal.querySelector('.back-to-main');
+        if (backButton) {
+          console.log(`Found back button, clicking it:`, backButton);
+          backButton.click();
+        }
+        
+        // 8. Try to trigger a custom event that Webflow might be listening for
+        modal.dispatchEvent(new CustomEvent('closeModal', { bubbles: true }));
+        
+        console.log(`Applied multiple closing methods to modal: ${modalId}`);
+        
+        // Optional: Add a small delay before showing the main filter interface
+        setTimeout(() => {
+          // Force hide again after a delay
+          modal.style.display = 'none';
+          modal.style.visibility = 'hidden';
+          modal.style.opacity = '0';
+          console.log(`Modal ${modalId} closed successfully`);
+        }, 100);
+      } else {
+        console.warn(`Modal with data-id="${modalId}" not found`);
+      }
+    }
+    
+    function setupModalButtonDelegation() {
+      console.log("Setting up modal button delegation...");
+      
+      // Use event delegation to catch button clicks anywhere in the document
+      document.addEventListener('click', (e) => {
+        // Check if clicked element is a clear button
+        if (e.target.matches('.btn-clear') || e.target.closest('.btn-clear')) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const button = e.target.matches('.btn-clear') ? e.target : e.target.closest('.btn-clear');
+          const modal = button.closest('[data-id]');
+          
+          if (modal) {
+            const modalId = modal.getAttribute('data-id');
+            console.log(`Clear button clicked via delegation for modal: ${modalId}`);
+            handleModalClearAll(modalId);
+          }
+          return;
+        }
+        
+        // Check if clicked element is an apply button
+        if (e.target.matches('.filter-submit:not(.btn-clear)') || e.target.closest('.filter-submit:not(.btn-clear)')) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const button = e.target.matches('.filter-submit:not(.btn-clear)') ? e.target : e.target.closest('.filter-submit:not(.btn-clear)');
+          const modal = button.closest('[data-id]');
+          
+          if (modal) {
+            const modalId = modal.getAttribute('data-id');
+            console.log(`Apply button clicked via delegation for modal: ${modalId}`);
+            handleModalApply(modalId);
+          }
+          return;
+        }
+        
+        // Check if clicked element is a back button
+        if (e.target.matches('.back-to-main') || e.target.closest('.back-to-main')) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const button = e.target.matches('.back-to-main') ? e.target : e.target.closest('.back-to-main');
+          const modal = button.closest('[data-id]');
+          
+          if (modal) {
+            const modalId = modal.getAttribute('data-id');
+            console.log(`Back button clicked via delegation for modal: ${modalId}`);
+            closeFilterModal(modalId);
+          }
+          return;
+        }
+        
+        // Check if clicked element is a close button
+        if (e.target.matches('.close-category') || e.target.closest('.close-category')) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const button = e.target.matches('.close-category') ? e.target : e.target.closest('.close-category');
+          const modal = button.closest('[data-id]');
+          
+          if (modal) {
+            const modalId = modal.getAttribute('data-id');
+            console.log(`Close button clicked via delegation for modal: ${modalId}`);
+            closeFilterModal(modalId);
+          }
+          return;
+        }
+      });
+      
+      console.log("Modal button delegation set up successfully");
+    }
+    
+    function preventModalFormSubmissions() {
+      console.log("Setting up form submission prevention...");
+      
+      // DIRECT APPROACH: Find all filter footers and attach listeners to their buttons
+      const filterFooters = document.querySelectorAll('.filter-footer');
+      console.log(`Found ${filterFooters.length} filter footers`);
+      
+      filterFooters.forEach((footer, index) => {
+        console.log(`Setting up filter footer ${index + 1}:`, footer);
+        
+        // Find all buttons in this footer
+        const allButtons = footer.querySelectorAll('a.w-button, a.filter-submit, button');
+        console.log(`Found ${allButtons.length} buttons in footer ${index + 1}`);
+        
+        // Set up listeners for each button
+        allButtons.forEach((button, btnIndex) => {
+          const buttonText = button.textContent.trim();
+          const buttonClasses = button.className;
+          console.log(`Button ${btnIndex + 1} in footer ${index + 1}: "${buttonText}" (${buttonClasses})`);
+          
+          // Attach click listener
+          button.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log(`Button clicked: "${buttonText}"`);
+            
+            // Find the modal this button belongs to
+            const modal = button.closest('[data-id]');
+            if (modal) {
+              const modalId = modal.getAttribute('data-id');
+              
+              // Handle based on button text
+              if (buttonText.toLowerCase().includes('clear')) {
+                console.log(`🧹 Clear button clicked in modal ${modalId}`);
+                
+                // DIRECT APPROACH: Clear all checkboxes in this modal
+                const checkboxItems = modal.querySelectorAll('.bal-dropdown-link.select-category');
+                console.log(`Found ${checkboxItems.length} checkboxes to clear`);
+                
+                checkboxItems.forEach((item, idx) => {
+                  const input = item.querySelector('input[type="checkbox"]');
+                  const customCb = item.querySelector('.w-checkbox-input');
+                  
+                  if (input) {
+                    console.log(`Clearing checkbox ${idx}`);
+                    input.checked = false;
+                    if (customCb) {
+                      customCb.classList.remove('w--redirected-checked');
+                    }
+                  }
+                });
+                
+                // Clear the state
+                if (modalId === 'group') {
+                  state.selectedGroups.clear();
+                } else if (modalId === 'categories' || modalId === 'category') {
+                  state.selectedCategories.clear();
+                } else if (modalId === 'code') {
+                  state.selectedCodes.clear();
+                } else if (modalId === 'thirdparty') {
+                  state.selectedThirdParties.clear();
+                }
+                
+                // Update display and close modal
+                updateMobileSortingDisplay();
+                applyMobileFilters();
+                closeFilterModal(modalId);
+                
+              } else if (buttonText.toLowerCase().includes('apply')) {
+                console.log(`✅ Apply button clicked in modal ${modalId}`);
+                
+                // Just close the modal - filters are already applied when checkboxes are clicked
+                closeFilterModal(modalId);
+              }
+            }
+            
+            return false;
+          });
+        });
+      });
+      
+      // Also handle forms (as a backup)
+      const modalForms = document.querySelectorAll('[data-id] form');
+      console.log(`Found ${modalForms.length} forms inside modals`);
+      
+      modalForms.forEach((form, index) => {
+        console.log(`Setting up form ${index + 1}:`, form);
+        
+        form.addEventListener('submit', (e) => {
+          console.log("Form submission prevented!");
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        });
+      });
+      
+      // Also prevent any button clicks inside modal forms from submitting
+      document.addEventListener('click', (e) => {
+        // Handle back and close buttons (not inside forms)
+        if (e.target.matches('.back-to-main') || e.target.closest('.back-to-main')) {
+          const modal = e.target.closest('[data-id]');
+          if (modal) {
+            e.preventDefault();
+            e.stopPropagation();
+            const modalId = modal.getAttribute('data-id');
+            console.log(`Back button clicked for modal: ${modalId}`);
+            closeFilterModal(modalId);
+            return false;
+          }
+        }
+        
+        if (e.target.matches('.close-category') || e.target.closest('.close-category')) {
+          const modal = e.target.closest('[data-id]');
+          if (modal) {
+            e.preventDefault();
+            e.stopPropagation();
+            const modalId = modal.getAttribute('data-id');
+            console.log(`Close button clicked for modal: ${modalId}`);
+            closeFilterModal(modalId);
+            return false;
+          }
+        }
+        
+        const button = e.target.closest('button, input[type="submit"], .btn-clear, .filter-submit');
+        if (button) {
+          const modalForm = button.closest('[data-id] form');
+          if (modalForm) {
+            console.log("Preventing button submission in modal form");
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Handle our custom buttons with detailed logging
+            const modal = button.closest('[data-id]');
+            if (modal) {
+              const modalId = modal.getAttribute('data-id');
+              const buttonText = button.textContent.trim();
+              const buttonClasses = button.className;
+              
+              console.log(`Button clicked in modal ${modalId}:`, {
+                text: buttonText,
+                classes: buttonClasses,
+                element: button
+              });
+              
+              if (button.matches('.btn-clear') || buttonText.toLowerCase().includes('clear')) {
+                console.log(`✅ Clear button identified for modal: ${modalId}`);
+                handleModalClearAll(modalId);
+              } else if (button.matches('.filter-submit:not(.btn-clear)') || buttonText.toLowerCase().includes('apply')) {
+                console.log(`✅ Apply button identified for modal: ${modalId}`);
+                handleModalApply(modalId);
+              } else {
+                console.log(`⚠️ Unhandled button in modal ${modalId}:`, buttonText);
+              }
+            }
+            
+            return false;
+          }
+        }
+      });
+      
+      console.log("Form submission prevention set up successfully");
+    }
+    
+    function setupMobileSortingTabs() {
+      console.log("Setting up mobile sorting tabs...");
+      
+      // Update tab display text based on current state
+      updateMobileSortingDisplay();
+      
+      // Set up modal click handlers - these will open the existing filter slide modals
+      // The modals are already populated with database data and have click handlers
+      
+      // Set up tab switching
+      if (dom.mobileGroupTab) {
+        dom.mobileGroupTab.addEventListener('click', () => {
+          console.log("Mobile Group tab clicked");
+          // Reset other filters when switching tabs
+          state.currentCategory = '';
+          updateMobileSortingDisplay();
+        });
+      }
+      
+      if (dom.mobileCategoriesTab) {
+        dom.mobileCategoriesTab.addEventListener('click', () => {
+          console.log("Mobile Categories tab clicked");
+          // Reset other filters when switching tabs
+          state.currentGroup = '';
+          updateMobileSortingDisplay();
+        });
+      }
+      
+      if (dom.mobileCodeTab) {
+        dom.mobileCodeTab.addEventListener('click', () => {
+          console.log("Mobile Code tab clicked");
+          // This is for sorting, not filtering
+          updateMobileSortingDisplay();
+        });
+      }
+    }
+    
+    function updateMobileSortingDisplay() {
+      console.log("Updating mobile sorting display...");
+      
+      // Update Group tab using data-modal="group"
+      const groupTab = document.querySelector('[data-modal="group"]');
+      if (groupTab) {
+        const groupSelect = groupTab.querySelector('.filter-tab-click-select');
+        if (groupSelect) {
+          const groupCount = state.selectedGroups.size;
+          if (groupCount > 0) {
+            const selectedItems = Array.from(state.selectedGroups);
+            if (groupCount === 1) {
+              groupSelect.textContent = selectedItems[0];
+            } else {
+              groupSelect.textContent = `${groupCount} Groups`;
+            }
+          } else {
+            groupSelect.textContent = 'All Groups';
+          }
+        }
+      }
+      
+      // Update Categories tab using data-modal="categories"
+      const categoriesTab = document.querySelector('[data-modal="categories"]');
+      if (categoriesTab) {
+        const categorySelect = categoriesTab.querySelector('.filter-tab-click-select');
+        if (categorySelect) {
+          const categoryCount = state.selectedCategories.size;
+          if (categoryCount > 0) {
+            const selectedItems = Array.from(state.selectedCategories);
+            if (categoryCount === 1) {
+              categorySelect.textContent = selectedItems[0];
+            } else {
+              categorySelect.textContent = `${categoryCount} Categories`;
+            }
+          } else {
+            categorySelect.textContent = 'All Categories';
+          }
+        }
+      }
+      
+      // Update Code tab using data-modal="code"
+      const codeTab = document.querySelector('[data-modal="code"]');
+      if (codeTab) {
+        const codeSelect = codeTab.querySelector('.filter-tab-click-select');
+        if (codeSelect) {
+          const codeCount = state.selectedCodes.size;
+          if (codeCount > 0) {
+            const selectedItems = Array.from(state.selectedCodes);
+            if (codeCount === 1) {
+              codeSelect.textContent = selectedItems[0];
+            } else {
+              codeSelect.textContent = `${codeCount} Codes`;
+            }
+          } else {
+            codeSelect.textContent = 'All Activities';
+          }
+        }
+      }
+      
+      // Update Third Party tab using data-modal="thirdparty"
+      const thirdPartyTab = document.querySelector('[data-modal="thirdparty"]');
+      if (thirdPartyTab) {
+        const thirdPartySelect = thirdPartyTab.querySelector('.filter-tab-click-select');
+        if (thirdPartySelect) {
+          const thirdPartyCount = state.selectedThirdParties.size;
+          if (thirdPartyCount > 0) {
+            const selectedItems = Array.from(state.selectedThirdParties);
+            if (thirdPartyCount === 1) {
+              // Show abbreviated version for long names
+              const item = selectedItems[0];
+              thirdPartySelect.textContent = item.length > 20 ? item.substring(0, 17) + '...' : item;
+            } else {
+              thirdPartySelect.textContent = `${thirdPartyCount} Selected`;
+            }
+          } else {
+            thirdPartySelect.textContent = 'None Required';
+          }
+        }
+      }
+    }
+    
+    function handleMobileCheckboxSelection(type, item, checkbox) {
+      console.log(`Mobile checkbox selection: ${type} = ${item}`);
+      
+      // Get the current state of the checkbox
+      const isChecked = checkbox.checked;
+      const customCheckbox = checkbox.closest('label')?.querySelector('.w-checkbox-input');
+      
+      console.log(`Checkbox state: checked=${isChecked}, customCheckbox=${!!customCheckbox}`);
+      
+      // Handle "Select All" logic
+      if (item === 'Select All Groups' || item === 'Select All Categories' || item === 'Select all activities') {
+        // Clear current selections
+        if (type === 'group') {
+          state.selectedGroups.clear();
+        } else if (type === 'category') {
+          state.selectedCategories.clear();
+        } else if (type === 'code') {
+          state.selectedCodes.clear();
+        } else if (type === 'thirdparty') {
+          state.selectedThirdParties.clear();
+        }
+        
+        // Uncheck all other checkboxes (both input and Webflow custom checkbox)
+        const container = getContainerByType(type);
+        const allCheckboxItems = container.querySelectorAll('.bal-dropdown-link.select-category');
+        
+        allCheckboxItems.forEach(checkboxItem => {
+          const input = checkboxItem.querySelector('input[type="checkbox"]');
+          const customCb = checkboxItem.querySelector('.w-checkbox-input');
+          
+          if (input && input !== checkbox) {
+            input.checked = false;
+            if (customCb) {
+              customCb.classList.remove('w--redirected-checked');
+            }
+          }
+        });
+        
+        // Check the "Select All" checkbox
+        checkbox.checked = true;
+        if (customCheckbox) {
+          customCheckbox.classList.add('w--redirected-checked');
+        }
+        
+        // Update display and apply filters
+        updateMobileSortingDisplay();
+        applyMobileFilters();
+        return;
+      }
+      
+      // Handle individual item selection (multi-select)
+      const selectedSet = getSelectedSetByType(type);
+      
+      if (isChecked) {
+        // Add to selection
+        selectedSet.add(item);
+        console.log(`Added ${item} to ${type} selection`);
+        
+        // Update Webflow custom checkbox
+        if (customCheckbox) {
+          customCheckbox.classList.add('w--redirected-checked');
+        }
+      } else {
+        // Remove from selection
+        selectedSet.delete(item);
+        console.log(`Removed ${item} from ${type} selection`);
+        
+        // Update Webflow custom checkbox
+        if (customCheckbox) {
+          customCheckbox.classList.remove('w--redirected-checked');
+        }
+      }
+      
+      // Uncheck "Select All" if individual items are selected
+      uncheckSelectAll(type);
+      
+      // Update display and apply filters
+      updateMobileSortingDisplay(); // Update tab display
+      applyMobileFilters();
+    }
+    
+    function getContainerByType(type) {
+      let container;
+      switch (type) {
+        case 'group': 
+          container = dom.mobileGroupCheckboxContainer;
+          break;
+        case 'category': 
+          container = dom.mobileCategoriesCheckboxContainer;
+          break;
+        case 'code': 
+          container = dom.mobileCodeCheckboxContainer;
+          break;
+        case 'thirdparty': 
+          container = dom.mobileThirdPartyCheckboxContainer;
+          break;
+        default: 
+          container = null;
+      }
+      
+      console.log(`getContainerByType(${type}):`, {
+        container: container,
+        hasContainer: !!container,
+        containerClasses: container?.className
+      });
+      
+      return container;
+    }
+    
+    function getSelectedSetByType(type) {
+      switch (type) {
+        case 'group': return state.selectedGroups;
+        case 'category': return state.selectedCategories;
+        case 'code': return state.selectedCodes;
+        case 'thirdparty': return state.selectedThirdParties;
+        default: return new Set();
+      }
+    }
+    
+    function uncheckSelectAll(type) {
+      const container = getContainerByType(type);
+      if (!container) return;
+      
+      const selectAllCheckbox = container.querySelector('input[type="checkbox"]');
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = false;
+      }
+    }
+    
+    function applyMobileFilters() {
+      console.log('Applying mobile filters:', {
+        groups: Array.from(state.selectedGroups),
+        categories: Array.from(state.selectedCategories),
+        codes: Array.from(state.selectedCodes)
+      });
+      
+      // Reset to first page and reload data
+      state.currentPage = 1;
+      renderPage(1);
+    }
+    
+    function updateMobileCheckboxStates(type) {
+      console.log(`📋 Updating checkbox states for type: ${type}`);
+      
+      const container = getContainerByType(type);
+      console.log(`Container found:`, container);
+      
+      if (!container) {
+        console.warn(`❌ No container found for type: ${type}`);
+        return;
+      }
+      
+      const selectedSet = getSelectedSetByType(type);
+      console.log(`Selected set for ${type}:`, Array.from(selectedSet));
+      
+      // Find all checkbox items (not just the input elements)
+      const allCheckboxItems = container.querySelectorAll('.bal-dropdown-link.select-category');
+      console.log(`Found ${allCheckboxItems.length} checkbox items in container`);
+      
+      // Clear all checkboxes (Webflow specific)
+      allCheckboxItems.forEach((checkboxItem, index) => {
+        const input = checkboxItem.querySelector('input[type="checkbox"]');
+        const customCheckbox = checkboxItem.querySelector('.w-checkbox-input');
+        const itemName = input?.dataset?.name;
+        
+        // Log what we found
+        console.log(`Checkbox item ${index}:`, {
+          item: checkboxItem,
+          input: input,
+          customCheckbox: customCheckbox,
+          itemName: itemName
+        });
+        
+        if (!input || !customCheckbox) {
+          console.warn(`⚠️ Missing input or custom checkbox for item ${index}`);
+          return;
+        }
+        
+        const wasChecked = input.checked;
+        const wasWebflowChecked = customCheckbox.classList.contains('w--redirected-checked');
+        
+        let shouldBeChecked = false;
+        
+        // Determine if this checkbox should be checked
+        if (itemName === 'Select All Groups' || itemName === 'Select All Categories' || itemName === 'Select all activities') {
+          // Check "Select All" if no individual items are selected
+          shouldBeChecked = selectedSet.size === 0;
+        } else {
+          // Check individual item if it's in the selected set
+          shouldBeChecked = selectedSet.has(itemName);
+        }
+        
+        // Update the actual checkbox
+        input.checked = shouldBeChecked;
+        
+        // Update Webflow's custom checkbox styling
+        if (shouldBeChecked) {
+          customCheckbox.classList.add('w--redirected-checked');
+        } else {
+          customCheckbox.classList.remove('w--redirected-checked');
+        }
+        
+        console.log(`Checkbox ${index} ${itemName ? `(${itemName})` : ''}: was: ${wasChecked}/${wasWebflowChecked}, now: ${shouldBeChecked}`);
+      });
+      
+      console.log(`✅ Finished updating ${allCheckboxItems.length} checkboxes for ${type}`);
+    }
+    
+    function handleMobileSortingSelection(type, selectedItem) {
+      console.log(`Mobile sorting selection: ${type} = ${selectedItem}`);
+      
+      switch (type) {
+        case 'group':
+          const newGroup = selectedItem === 'All Groups' ? '' : selectedItem;
+          handleGroupChange(newGroup);
+          break;
+          
+        case 'categories':
+          const newCategory = selectedItem === 'All Categories' ? '' : selectedItem;
+          handleCategoryChange(newCategory);
+          break;
+          
+        case 'code':
+          // Handle code sorting (ascending/descending)
+          handleCodeSorting(selectedItem);
+          break;
+      }
+      
+      // Update the display
+      updateMobileSortingDisplay();
+    }
+    
+    function handleCodeSorting(sortOrder) {
+      console.log(`Code sorting: ${sortOrder}`);
+      // Store sort order in state
+      state.codeSortOrder = sortOrder.toLowerCase();
+      
+      // Re-render with new sort order
+      state.currentPage = 1;
+      renderPage(1);
     }
   
     // ─── Modal Logic ───────────────────────────────────────────────
@@ -577,12 +1881,13 @@
     function handleCategoryChange(newCategory) {
       if (state.currentCategory === newCategory) return;
       
-(`Changing category to: "${newCategory || 'All'}"`);
+      console.log(`Changing category to: "${newCategory || 'All'}"`);
       
       state.currentCategory = newCategory;
       state.currentGroup = ''; // Reset group when changing category
       
       updateActiveCategoryClass();
+      updateMobileSortingDisplay(); // Update mobile display
       
       // Reset to first page and reload data
       state.currentPage = 1;
@@ -592,12 +1897,13 @@
     function handleGroupChange(newGroup) {
       if (state.currentGroup === newGroup) return;
       
-(`Changing group to: "${newGroup || 'All'}"`);
+      console.log(`Changing group to: "${newGroup || 'All'}"`);
       
       state.currentGroup = newGroup;
       state.currentCategory = ''; // Reset category when changing group
       
       updateActiveCategoryClass();
+      updateMobileSortingDisplay(); // Update mobile display
       
       // Reset to first page and reload data
       state.currentPage = 1;
@@ -661,9 +1967,9 @@
       }
       
       state.currentPage = page;
-        const { currentCategory, currentGroup, searchTerm, columnFilters, thirdPartyApproval, selectedThirdParties } = state;
-  
-        const cacheKey = `${currentCategory}|${currentGroup}|${searchTerm}|${columnFilters}|${thirdPartyApproval}|${selectedThirdParties.join(',')}|${page}`;
+        const { currentCategory, currentGroup, searchTerm, columnFilters, thirdPartyApproval, selectedThirdParties, selectedGroups, selectedCategories, selectedCodes, fawriMode } = state;
+
+        const cacheKey = `${currentCategory}|${currentGroup}|${searchTerm}|${columnFilters}|${thirdPartyApproval}|${Array.from(selectedThirdParties).join(',')}|${Array.from(selectedGroups).join(',')}|${Array.from(selectedCategories).join(',')}|${Array.from(selectedCodes).join(',')}|${fawriMode}|${page}`;
 ("Cache key:", cacheKey);
       
       const cachedResult = cache.get(cacheKey);
@@ -698,6 +2004,12 @@
         query = query.or(`"Activity Name".ilike.%${searchTerm}%,Code.ilike.%${searchTerm}%,النشاط.ilike.%${searchTerm}%`);
       }
       
+      // Apply FAWRI mode filter (Low and Medium risk activities only)
+      if (fawriMode) {
+        console.log('Applying FAWRI mode filter: Low and Medium risk activities only');
+        query = query.in('Risk Rating', ['Low', 'Medium']);
+      }
+      
       // Apply third party approval filter if enabled
       if (thirdPartyApproval) {
   ("Applying third party approval filter");
@@ -705,9 +2017,25 @@
       }
       
       // Apply specific third party filters if any are selected
-      if (selectedThirdParties.length > 0) {
-  (`Filtering by specific third parties: ${selectedThirdParties.join(', ')}`);
-        query = query.in('Third Party', selectedThirdParties);
+      if (selectedThirdParties.size > 0) {
+        console.log(`Filtering by specific third parties: ${Array.from(selectedThirdParties).join(', ')}`);
+        query = query.in('Third Party', Array.from(selectedThirdParties));
+      }
+      
+      // Apply mobile multi-select filters
+      if (selectedGroups.size > 0) {
+        console.log(`Applying mobile group filters: ${Array.from(selectedGroups).join(', ')}`);
+        query = query.in('Group', Array.from(selectedGroups));
+      }
+      
+      if (selectedCategories.size > 0) {
+        console.log(`Applying mobile category filters: ${Array.from(selectedCategories).join(', ')}`);
+        query = query.in('Category', Array.from(selectedCategories));
+      }
+      
+      if (selectedCodes.size > 0) {
+        console.log(`Applying mobile code filters: ${Array.from(selectedCodes).join(', ')}`);
+        query = query.in('Code', Array.from(selectedCodes));
       }
       
       // Apply column-specific filters
@@ -797,7 +2125,10 @@
   
       const from = (page - 1) * PER_PAGE;
       const to = from + PER_PAGE - 1;
-      query = query.order('Code', { ascending: true }).range(from, to);
+      
+      // Apply sorting based on mobile sorting state
+      const isAscending = !state.codeSortOrder || state.codeSortOrder === 'ascending';
+      query = query.order('Code', { ascending: isAscending }).range(from, to);
   (`Range: ${from} to ${to}`);
   
   ("Executing query...");
@@ -900,7 +2231,14 @@
       // Remove any existing bottom loader
       hideBottomLoader();
       
-      // Create a loader row at the bottom
+      if (isMobileView() && dom.mobileListEl) {
+        // Mobile view - add loader to mobile container
+        const loaderDiv = document.createElement('div');
+        loaderDiv.className = 'bottom-loader-row';
+        loaderDiv.appendChild(createLoader());
+        dom.mobileListEl.appendChild(loaderDiv);
+      } else if (dom.tableBodyEl) {
+        // Desktop view - add loader to table
       const loaderRow = document.createElement('tr');
       loaderRow.className = 'table_row bottom-loader-row';
       const loaderCell = document.createElement('td');
@@ -910,16 +2248,24 @@
       loaderRow.appendChild(loaderCell);
       
       // Append to the table body
-      if (dom.tableBodyEl) {
         dom.tableBodyEl.appendChild(loaderRow);
       }
     }
     
     // Hide the bottom loader
     function hideBottomLoader() {
-      const loaderRow = dom.tableBodyEl?.querySelector('.bottom-loader-row');
+      if (isMobileView() && dom.mobileListEl) {
+        // Mobile view - remove bottom loader from mobile container
+        const loaderRow = dom.mobileListEl.querySelector('.bottom-loader-row');
       if (loaderRow) {
         loaderRow.remove();
+        }
+      } else if (dom.tableBodyEl) {
+        // Desktop view - remove bottom loader from table
+        const loaderRow = dom.tableBodyEl.querySelector('.bottom-loader-row');
+        if (loaderRow) {
+          loaderRow.remove();
+        }
       }
     }
   
@@ -928,24 +2274,41 @@
       hideLoader();
       hideBottomLoader();
       
-      // Verify tableBodyEl is still valid
-      if (!dom.tableBodyEl) {
-        // console.error("Table body element is missing when trying to render results");
+      const isMobile = isMobileView();
+      
+      // Verify container elements are valid based on view type
+      if (isMobile && !dom.mobileListEl) {
+        console.warn("Mobile container element is missing when trying to render mobile results");
+        return;
+      } else if (!isMobile && !dom.tableBodyEl) {
+        console.warn("Table body element is missing when trying to render desktop results");
         return;
       }
       
-      // Only clear the table if not appending
+      // Only clear the container if not appending
       if (!append) {
-  ("Clearing table body");
+        if (isMobile) {
+          console.log("Clearing mobile list container");
+          dom.mobileListEl.innerHTML = '';
+        } else {
+          console.log("Clearing table body");
       dom.tableBodyEl.innerHTML = '';
+        }
       } else {
-  ("Appending to existing table content");
+        console.log("Appending to existing content");
       }
   
       if (data?.length > 0) {
-  (`Creating ${data.length} rows`);
+        console.log(`Creating ${data.length} ${isMobile ? 'mobile items' : 'table rows'}`);
         data.forEach((item, index) => {
-    (`Creating row ${index + 1}/${data.length}`);
+          console.log(`Creating ${isMobile ? 'mobile item' : 'row'} ${index + 1}/${data.length}`);
+          
+          if (isMobile) {
+            // Render mobile version
+            const mobileItem = createMobileItem(item);
+            dom.mobileListEl.appendChild(mobileItem);
+          } else {
+            // Render desktop table version
           const row = document.createElement('tr');
           row.className = 'table_row';
           
@@ -1091,10 +2454,19 @@
           });
           
           dom.tableBodyEl.appendChild(row);
+          }
         });
       } else {
-  ("No data to display, showing 'no results' message");
-        // Create a row with a "no results" message
+        console.log("No data to display, showing 'no results' message");
+        if (isMobile) {
+          // Mobile no results message
+          const noResultsDiv = document.createElement('div');
+          noResultsDiv.className = 'no-results-mobile';
+          noResultsDiv.textContent = 'No activities found matching your criteria.';
+          noResultsDiv.style.cssText = 'text-align: center; padding: 40px 20px; color: #666;';
+          dom.mobileListEl.appendChild(noResultsDiv);
+        } else {
+          // Desktop no results message
         const noResultsRow = document.createElement('tr');
         noResultsRow.className = 'table_row';
         const noResultsCell = document.createElement('td');
@@ -1107,9 +2479,10 @@
         
         try {
         dom.tableBodyEl.appendChild(noResultsRow);
-    ("No results message added to table");
+            console.log("No results message added to table");
         } catch (err) {
-          // console.error("Error appending no results message:", err);
+            console.error("Error appending no results message:", err);
+          }
         }
       }
   
@@ -1241,112 +2614,93 @@
       return modalEl;
     }
   
-    // ─── Pagination Logic ──────────────────────────────────────────
-  
-    function renderPagination(currentPageNum, totalCount) {
-      const totalPages = Math.ceil((totalCount || 0) / PER_PAGE) || 1;
-      dom.pagerEl.innerHTML = '';
-      if (totalPages <= 1) return;
-  
-      const paginationWrapper = document.createElement('div');
-      paginationWrapper.className = 'pagination_page-wrapper';
-      
-      const createButton = (text, page, isDisabled, isCurrent, className) => {
-        const button = document.createElement('button');
-        button.textContent = text;
-        button.disabled = isDisabled;
-        button.className = className || '';
-        if (isCurrent) button.classList.add('current-page');
-        button.style.cssText = 'background-color:transparent; border:none; cursor:pointer;';
-        if (!isDisabled) button.onclick = () => renderPage(page);
-        return button;
-      };
-      
-      paginationWrapper.appendChild(createButton('Previous', currentPageNum - 1, currentPageNum === 1, false, 'pagination_previous'));
-  
-      const pageRange = 2;
-      const startPage = Math.max(1, currentPageNum - pageRange);
-      const endPage = Math.min(totalPages, currentPageNum + pageRange);
-  
-      if (startPage > 1) {
-        paginationWrapper.appendChild(createButton('1', 1, false, false, ''));
-        if (startPage > 2) paginationWrapper.insertAdjacentHTML('beforeend', '<span>...</span>');
-      }
-  
-      for (let page = startPage; page <= endPage; page++) {
-        paginationWrapper.appendChild(createButton(page.toString(), page, false, page === currentPageNum, ''));
-      }
-  
-      if (endPage < totalPages) {
-        if (endPage < totalPages - 1) paginationWrapper.insertAdjacentHTML('beforeend', '<span>...</span>');
-        paginationWrapper.appendChild(createButton(totalPages.toString(), totalPages, false, false, ''));
-      }
-      
-      paginationWrapper.appendChild(createButton('Next', currentPageNum + 1, currentPageNum === totalPages, false, 'pagination-next'));
-      dom.pagerEl.appendChild(paginationWrapper);
-    }
   
     // ─── Search Functionality ──────────────────────────────────────
   
     function setupSearch() {
-("Setting up search functionality...");
+      console.log("Setting up search functionality...");
       
-      // Set up main search form
-      if (dom.searchForm) {
-  ("Search form found, setting up to prevent submission");
+      // Set up all search inputs (desktop and mobile)
+      if (dom.searchInputs && dom.searchInputs.length > 0) {
+        console.log(`Found ${dom.searchInputs.length} search inputs, setting up search-on-type for all`);
         
-        // Find search input directly in the form
-        const formSearchInput = dom.searchForm.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-        if (formSearchInput) {
-    ("Search input found directly in form, setting up search-on-type");
+        // Set up search-on-type with debounce for all search inputs
+        const handleSearchInput = debounce((event) => {
+          const searchTerm = event.target.value.trim();
           
-          // Set up search-on-type with debounce (350ms is a good balance between responsiveness and performance)
-          const handleSearchInput = debounce((event) => {
-            const searchTerm = event.target.value.trim();
-            
-            // Update state
+          console.log(`Search term from ${event.target.id || event.target.className}: "${searchTerm}"`);
+          state.searchTerm = searchTerm;
+          state.currentPage = 1;
+          renderPage(1);
+          
+          // Sync the search term to all other search inputs
+          dom.searchInputs.forEach(input => {
+            if (input !== event.target && input.value !== searchTerm) {
+              input.value = searchTerm;
+            }
+          });
+        }, 350);
+        
+        // Attach event listeners to all search inputs
+        dom.searchInputs.forEach((searchInput, index) => {
+          console.log(`Setting up search input ${index + 1}:`, searchInput.id || searchInput.className);
+          
+          // Attach search-on-type event listener
+          searchInput.addEventListener('input', handleSearchInput);
+          
+          // Prevent form submission on Enter key and trigger search
+          searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              
+              // Trigger search manually on Enter
+              const searchTerm = searchInput.value.trim();
+              console.log(`Search term from Enter key: ${searchTerm}`);
+              
             state.searchTerm = searchTerm;
-            
-            // Reset to first page and reload data
             state.currentPage = 1;
             renderPage(1);
-          }, 350);
-          
-          formSearchInput.addEventListener('input', handleSearchInput);
-        }
+              
+              // Sync to all search inputs
+              dom.searchInputs.forEach(input => {
+                if (input.value !== searchTerm) {
+                  input.value = searchTerm;
+                }
+              });
+            }
+          });
+        });
+      }
+      
+      // Set up main search form to prevent submission
+      if (dom.searchForm) {
+        console.log("Search form found, setting up to prevent submission");
         
         // Prevent form submission - use capture phase to ensure it's caught early
         dom.searchForm.addEventListener('submit', (event) => {
-    ("Form submit event detected - preventing default");
+          console.log("Form submit event detected - preventing default");
           event.preventDefault();
           event.stopPropagation();
           
           // Find the search input directly within the form
           const searchInput = event.target.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-    ("Search input found within form:", !!searchInput);
+          console.log("Search input found within form:", !!searchInput);
           
           // Trigger search manually
           if (searchInput) {
             const searchTerm = searchInput.value.trim();
-      (`Search term from form submit (direct): ${searchTerm}`);
+            console.log(`Search term from form submit: ${searchTerm}`);
             
-            // Update state
             state.searchTerm = searchTerm;
-            
-            // Reset to first page and reload data
             state.currentPage = 1;
             renderPage(1);
-          } else if (dom.searchEl) {
-            // Fallback to dom.searchEl
-            const searchTerm = dom.searchEl.value.trim();
-      (`Search term from form submit (fallback): ${searchTerm}`);
             
-            // Update state
-            state.searchTerm = searchTerm;
-            
-            // Reset to first page and reload data
-            state.currentPage = 1;
-            renderPage(1);
+            // Sync to all search inputs
+            dom.searchInputs.forEach(input => {
+              if (input.value !== searchTerm) {
+                input.value = searchTerm;
+              }
+            });
           }
           
           return false; // Extra measure to prevent submission
@@ -1354,13 +2708,14 @@
         
         // Also prevent default on the form itself using the onsubmit property
         dom.searchForm.onsubmit = function() {
-    ("Form onsubmit triggered - preventing default");
+          console.log("Form onsubmit triggered - preventing default");
           return false;
         };
+      }
         
-        // Set up search submit button click
+      // Set up search submit buttons
         if (dom.searchSubmitBtn) {
-    ("Search submit button found");
+        console.log("Search submit button found");
           
           // Remove any existing click listeners
           const newSubmitBtn = dom.searchSubmitBtn.cloneNode(true);
@@ -1371,89 +2726,55 @@
           
           // Add new click listener
           dom.searchSubmitBtn.addEventListener('click', (event) => {
-      ("Search button clicked - preventing default");
-            // Prevent default behavior
+          console.log("Search button clicked - preventing default");
             event.preventDefault();
             event.stopPropagation();
             
-            // Find the closest form
-            const form = event.target.closest('form');
-      ("Form found from button:", !!form);
-            
-            // Find search input directly in the form
+          // Find search input in multiple ways
             let searchInput = null;
-            if (form) {
-              searchInput = form.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-        ("Search input found in form from button:", !!searchInput);
-            }
             
-            // If not found in form, try to find it near the button
-            if (!searchInput) {
+          // Strategy 1: Look for input in the same container
               const searchContainer = event.target.closest('.bal-search');
               if (searchContainer) {
-                searchInput = searchContainer.querySelector('input');
-          ("Search input found in container from button:", !!searchInput);
-              }
+            searchInput = searchContainer.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
+            console.log("Search input found in container from button:", !!searchInput);
+          }
+          
+          // Strategy 2: Look for input in the same form
+          if (!searchInput) {
+            const form = event.target.closest('form');
+            if (form) {
+              searchInput = form.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
+              console.log("Search input found in form from button:", !!searchInput);
             }
-            
-            // Trigger search manually
+          }
+          
+          // Strategy 3: Use the first search input from our collection
+          if (!searchInput && dom.searchInputs.length > 0) {
+            searchInput = dom.searchInputs[0];
+            console.log("Using first search input from collection");
+          }
+          
+          // Trigger search if we found an input
             if (searchInput) {
               const searchTerm = searchInput.value.trim();
-        (`Search term from button click (direct): ${searchTerm}`);
-              
-              // Update state
+            console.log(`Search triggered from button: "${searchTerm}"`);
               state.searchTerm = searchTerm;
-              
-              // Reset to first page and reload data
               state.currentPage = 1;
               renderPage(1);
-            } else if (dom.searchEl) {
-              // Fallback to dom.searchEl
-              const searchTerm = dom.searchEl.value.trim();
-        (`Search term from button click (fallback): ${searchTerm}`);
-              
-              // Update state
-              state.searchTerm = searchTerm;
-              
-              // Reset to first page and reload data
-              state.currentPage = 1;
-              renderPage(1);
+            
+            // Sync to all search inputs
+            dom.searchInputs.forEach(input => {
+              if (input.value !== searchTerm) {
+                input.value = searchTerm;
+              }
+            });
+          } else {
+            console.log("No search input found from button click");
             }
             
             return false; // Extra measure to prevent submission
           }, true); // Use capture phase
-        }
-      }
-      
-      // Setup global search if available
-      if (dom.searchEl) {
-  ("Search input element found");
-        let searchTimeout;
-        dom.searchEl.addEventListener('input', () => {
-          clearTimeout(searchTimeout);
-          searchTimeout = setTimeout(() => {
-            state.searchTerm = dom.searchEl.value.trim();
-            state.currentPage = 1;
-            renderPage(1);
-          }, 300);
-        });
-    
-        dom.searchEl.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            
-            // Trigger search manually on Enter
-            const searchTerm = dom.searchEl.value.trim();
-      (`Search term from Enter key: ${searchTerm}`);
-            
-            // Update state
-            state.searchTerm = searchTerm;
-            
-            // Reset to first page and reload data
-            state.currentPage = 1;
-            renderPage(1);
-          }
-        });
       }
       
       // Setup column-specific search
@@ -2230,31 +3551,41 @@
       }
     }
     
-    // Render saved items in the saved items table
+    // Render saved items in both mobile and desktop views
     function renderSavedItems() {
-("Rendering saved items...");
+      console.log("Rendering saved items...");
       
       // Re-query the DOM in case it wasn't available during initialization
       if (!dom.savedTableBody) {
-  ("Saved table body not found in DOM object, trying to re-query...");
+        console.log("Saved table body not found in DOM object, trying to re-query...");
         dom.savedTableBody = document.querySelector('.bal-table-saved-tbody, #saved_list_table tbody, .bal-table-saved tbody');
-  ("Re-query result:", !!dom.savedTableBody);
+        console.log("Re-query result:", !!dom.savedTableBody);
       }
       
-      if (!dom.savedTableBody) {
-        // console.error("Cannot find saved table body element");
-        return;
+      // Also re-query mobile container
+      if (!dom.savedMobileContainer) {
+        console.log("Saved mobile container not found, trying to re-query...");
+        dom.savedMobileContainer = document.querySelector('.bal-wrapper.for-mobile.saaved-items, .bal-wrapper.for-mobile.saved-items');
+        console.log("Mobile container re-query result:", !!dom.savedMobileContainer);
       }
       
       const savedActivities = getSavedActivities();
-(`Found ${savedActivities.length} saved activities to render`);
+      console.log(`Found ${savedActivities.length} saved activities to render`);
       
-      // Clear the table
-("Clearing saved table body...");
+      // Clear both desktop table and mobile container
+      if (dom.savedTableBody) {
+        console.log("Clearing saved table body...");
       dom.savedTableBody.innerHTML = '';
+      }
+      
+      if (dom.savedMobileContainer) {
+        console.log("Clearing saved mobile container...");
+        dom.savedMobileContainer.innerHTML = '';
+      }
       
       if (savedActivities.length === 0) {
-        // Show empty state
+        // Show empty state for desktop
+        if (dom.savedTableBody) {
         const emptyRow = document.createElement('tr');
         emptyRow.className = 'bal-table-saved-trow';
         
@@ -2267,9 +3598,21 @@
         
         emptyRow.appendChild(emptyCell);
         dom.savedTableBody.appendChild(emptyRow);
+        }
+        
+        // Show empty state for mobile
+        if (dom.savedMobileContainer) {
+          const emptyDiv = document.createElement('div');
+          emptyDiv.className = 'no-saved-mobile';
+          emptyDiv.textContent = 'No saved activities';
+          emptyDiv.style.cssText = 'text-align: center; padding: 40px 20px; color: #666;';
+          dom.savedMobileContainer.appendChild(emptyDiv);
+        }
       } else {
-        // Add each saved activity to the table
+        // Add each saved activity to both desktop table and mobile container
         savedActivities.forEach(item => {
+          // Create desktop table row
+          if (dom.savedTableBody) {
           const row = document.createElement('tr');
           row.className = 'bal-table-saved-trow';
           
@@ -2386,6 +3729,13 @@
           row.dataset.activityCode = item.Code;
           
           dom.savedTableBody.appendChild(row);
+          }
+          
+          // Create mobile item
+          if (dom.savedMobileContainer) {
+            const mobileItem = createMobileSavedItem(item);
+            dom.savedMobileContainer.appendChild(mobileItem);
+          }
         });
       }
       
@@ -2596,13 +3946,11 @@
     (`Checkbox changed: ${thirdPartyName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
           
           if (event.target.checked) {
-            // Add to selected third parties if not already there
-            if (!state.selectedThirdParties.includes(thirdPartyName)) {
-              state.selectedThirdParties.push(thirdPartyName);
-            }
+            // Add to selected third parties
+            state.selectedThirdParties.add(thirdPartyName);
           } else {
             // Remove from selected third parties
-            state.selectedThirdParties = state.selectedThirdParties.filter(tp => tp !== thirdPartyName);
+            state.selectedThirdParties.delete(thirdPartyName);
           }
           
     ("Selected third parties:", state.selectedThirdParties);
@@ -2667,6 +4015,143 @@
       }
     }
     
+    // ─── FAWRI Activities Toggle Setup ─────────────────────────────
+    
+    function setupFawriToggle() {
+      console.log("Setting up FAWRI Activities toggle...");
+      
+      // Setup desktop toggle
+      setupDesktopFawriToggle();
+      
+      // Setup mobile toggle
+      setupMobileFawriToggle();
+      
+      // Initialize with Regular Activities active
+      updateFawriToggleActive();
+    }
+    
+    function setupDesktopFawriToggle() {
+      // Check if the desktop FAWRI toggle elements exist
+      if (!dom.regularActivitiesTab || !dom.fawriActivitiesTab) {
+        console.warn("Desktop FAWRI toggle elements not found");
+        return;
+      }
+      
+      console.log("Desktop FAWRI toggle elements found");
+      
+      // Set up Regular Activities tab click handler
+      dom.regularActivitiesTab.addEventListener('click', (event) => {
+        event.preventDefault();
+        console.log("Desktop Regular Activities tab clicked");
+        
+        // Update state
+        state.fawriMode = false;
+        
+        // Update active classes
+        updateFawriToggleActive();
+        
+        // Reset to first page and reload data
+        state.currentPage = 1;
+        cache.clear(); // Clear cache when changing filters
+        renderPage(1);
+      });
+      
+      // Set up FAWRI Activities tab click handler
+      dom.fawriActivitiesTab.addEventListener('click', (event) => {
+        event.preventDefault();
+        console.log("Desktop FAWRI Activities tab clicked");
+        
+        // Update state
+        state.fawriMode = true;
+        
+        // Update active classes
+        updateFawriToggleActive();
+        
+        // Reset to first page and reload data
+        state.currentPage = 1;
+        cache.clear(); // Clear cache when changing filters
+        renderPage(1);
+      });
+    }
+    
+    function setupMobileFawriToggle() {
+      // Check if the mobile FAWRI toggle elements exist
+      if (!dom.mobileRegularActivitiesTab || !dom.mobileFawriActivitiesTab) {
+        console.warn("Mobile FAWRI toggle elements not found");
+        return;
+      }
+      
+      console.log("Mobile FAWRI toggle elements found");
+      
+      // Set up Mobile Regular Activities tab click handler
+      dom.mobileRegularActivitiesTab.addEventListener('click', (event) => {
+        event.preventDefault();
+        console.log("Mobile Regular Activities tab clicked");
+        
+        // Update state
+        state.fawriMode = false;
+        
+        // Update active classes
+        updateFawriToggleActive();
+        
+        // Reset to first page and reload data
+        state.currentPage = 1;
+        cache.clear(); // Clear cache when changing filters
+        renderPage(1);
+      });
+      
+      // Set up Mobile FAWRI Activities tab click handler
+      dom.mobileFawriActivitiesTab.addEventListener('click', (event) => {
+        event.preventDefault();
+        console.log("Mobile FAWRI Activities tab clicked");
+        
+        // Update state
+        state.fawriMode = true;
+        
+        // Update active classes
+        updateFawriToggleActive();
+        
+        // Reset to first page and reload data
+        state.currentPage = 1;
+        cache.clear(); // Clear cache when changing filters
+        renderPage(1);
+      });
+    }
+    
+    function updateFawriToggleActive() {
+      // Update desktop toggle active state
+      if (dom.regularActivitiesTab && dom.fawriActivitiesTab) {
+        // Remove active class from both desktop tabs
+        dom.regularActivitiesTab.classList.remove('is-active');
+        dom.fawriActivitiesTab.classList.remove('is-active');
+        
+        // Add active class to the appropriate desktop tab
+        if (state.fawriMode) {
+          dom.fawriActivitiesTab.classList.add('is-active');
+          console.log("Desktop FAWRI Activities tab activated");
+        } else {
+          dom.regularActivitiesTab.classList.add('is-active');
+          console.log("Desktop Regular Activities tab activated");
+        }
+      }
+      
+      // Update mobile toggle active state
+      if (dom.mobileRegularActivitiesTab && dom.mobileFawriActivitiesTab) {
+        // Remove active class from both mobile tabs
+        dom.mobileRegularActivitiesTab.classList.remove('is-active');
+        dom.mobileFawriActivitiesTab.classList.remove('is-active');
+        
+        // Add active class to the appropriate mobile tab
+        if (state.fawriMode) {
+          dom.mobileFawriActivitiesTab.classList.add('is-active');
+          console.log("Mobile FAWRI Activities tab activated");
+        } else {
+          dom.mobileRegularActivitiesTab.classList.add('is-active');
+          console.log("Mobile Regular Activities tab activated");
+        }
+      }
+    }
+    
     // ─── Initialization ────────────────────────────────────────────
   
     async function initialize() {
@@ -2712,12 +4197,17 @@
         }
         
         // Set up category and group filters
-  ("Initializing category and group filters...");
+        console.log("Initializing category and group filters...");
         await initCategoryRadios();
+        
+        // Set up mobile sorting
+        console.log("Initializing mobile sorting...");
+        await initMobileSorting();
         
         // Always default to 'All Categories' on page load
         state.currentCategory = '';
         state.currentGroup = '';
+        state.codeSortOrder = 'ascending'; // Default sort order
         
         // Update active classes
         updateActiveCategoryClass();
@@ -2729,6 +4219,10 @@
         // Set up third party approval filter
   ("Setting up third party approval filter...");
         setupThirdPartyFilter();
+        
+        // Set up FAWRI Activities toggle
+        console.log("Setting up FAWRI Activities toggle...");
+        setupFawriToggle();
         
         // Load saved items
   ("Loading saved items...");
@@ -2747,6 +4241,7 @@
         // Re-query DOM elements for search
         dom.searchForm = document.querySelector('#wf-form-searchInput, form[name="wf-form-searchInput"]');
         dom.searchEl = document.querySelector('#search-input, .bal-search-input, input[type="search"], #global-search, .search-input');
+        dom.searchInputs = document.querySelectorAll('#search-input, .bal-search-input, input[name="searchInput"], .main-search input[type="text"]');
         dom.searchSubmitBtn = document.querySelector('.bal-search-submit, .bal-search svg, .bal-search-submit svg');
         
         // Log search elements
@@ -2792,6 +4287,17 @@
   ("Loading initial data...");
         state.currentPage = 1;
         await renderPage(1);
+        
+        // Set up modal footer buttons (after everything is loaded)
+        console.log("Setting up modal footer buttons after initialization...");
+        setupModalFooterButtons();
+        
+        // Also set up event delegation for modal buttons (fallback)
+        setupModalButtonDelegation();
+        
+        // Prevent form submissions in modal footers
+        preventModalFormSubmissions();
+        
   ("Initialization complete");
         
       } catch (error) {
@@ -2829,6 +4335,18 @@
         }, 100);
       });
     }
+  
+    // ─── Handle window resize for responsive switching ─────────────
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        // Re-render current page when switching between mobile/desktop
+        if (state.currentPage) {
+          renderPage(state.currentPage);
+        }
+      }, 300); // Debounce resize events
+    });
   
     // ─── Start on DOM ready ────────────────────────────────────────
     if (document.readyState === 'loading') {
