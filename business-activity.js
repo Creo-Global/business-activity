@@ -409,7 +409,6 @@
       return loaderContainer;
     }
 
-  
     function showLoader() {
       if (isMobileView() && dom.mobileListEl) {
         // Mobile view - show loader in mobile container
@@ -462,8 +461,7 @@
     // ─── Mobile Sorting/Filtering Logic ─────────────────────────────
 
     async function initMobileSorting() {
-    
-      
+
       if (!dom.mobileSortingTabs) {
       
         return;
@@ -473,7 +471,7 @@
       // Fetch categories, groups, codes, and third parties from database
       const { data, error } = await supabase.from('Activity List').select('Category, Group, Code, "Third Party"');
         if (error) {
-          console.error("Error fetching data for mobile sorting:", error);
+          // 
           return;
         }
         
@@ -483,10 +481,7 @@
         const codes = Array.from(new Set(data.map(r => r.Code).filter(Boolean))).sort();
       
         const thirdParties = Array.from(new Set(data.map(r => r['Third Party']).filter(Boolean))).sort();
-      console.log("✅ Extracted third parties:", thirdParties.length, thirdParties);
-        
-      
-        
+
         // Find and populate existing modal containers
         findMobileModalContainers();
         populateExistingModals(categories, groups, codes, thirdParties);
@@ -497,24 +492,22 @@
         // Set up footer buttons for all modals (with delay to ensure DOM is ready)
       
         setTimeout(() => {
-          setupModalFooterButtons();
+          // setupModalFooterButtons(); // Disabled - using modal management system instead
         }, 500);
         
         // Initialize display
         updateMobileSortingDisplay();
         
       } catch (error) {
-        console.error("Error in initMobileSorting:", error);
+        // 
       }
     }
     
     function findMobileModalContainers() {
-    
-      
+
       // Debug: log all elements with data-id attributes
       const allDataIdElements = document.querySelectorAll('[data-id]');
-    
-      
+
       // Look for modals with specific data-id attributes
       const groupModal = document.querySelector('[data-id="group"]');
       const categoriesModal = document.querySelector('[data-id="categories"]') || document.querySelector('[data-id="category"]');
@@ -558,17 +551,17 @@
       }
       
       if (thirdPartyModal) {
-      console.log("✅ Found third party modal:", thirdPartyModal);
+
         const thirdPartyCheckboxContainer = thirdPartyModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
       
         if (thirdPartyCheckboxContainer) {
-        console.log("✅ Found third party checkbox container:", thirdPartyCheckboxContainer);
+
           dom.mobileThirdPartyCheckboxContainer = thirdPartyCheckboxContainer;
       } else {
-        console.warn("❌ Third party checkbox container not found in modal");
+
         }
       } else {
-      console.warn("❌ Third party modal not found with [data-id='thirdparty']");
+
       }
       
       // Fallback: if data-id approach doesn't work, use the search input placeholder method
@@ -592,12 +585,7 @@
     }
     
     function populateExistingModals(categories, groups, codes, thirdParties) {
-    console.log("📋 populateExistingModals called with:");
-    console.log("  - Categories:", categories?.length || 0);
-    console.log("  - Groups:", groups?.length || 0);  
-    console.log("  - Codes:", codes?.length || 0);
-    console.log("  - Third Parties:", thirdParties?.length || 0, thirdParties);
-      
+
       // Populate groups modal
       if (dom.mobileGroupCheckboxContainer) {
       populateCheckboxContainer(dom.mobileGroupCheckboxContainer, groups, 'group');
@@ -614,36 +602,27 @@
       }
       
     // Populate third party modal with all data from database (like desktop version)
-    console.log("🎯 Checking third party container:", !!dom.mobileThirdPartyCheckboxContainer);
-    console.log("🎯 Third party container element:", dom.mobileThirdPartyCheckboxContainer);
+
       if (dom.mobileThirdPartyCheckboxContainer) {
-      console.log("✅ Third party container found, populating with database data...");
-      console.log("📊 Third parties from database:", thirdParties?.length || 0, thirdParties);
-      
+
       if (thirdParties && thirdParties.length > 0) {
         populateThirdPartyModal(dom.mobileThirdPartyCheckboxContainer, thirdParties);
       } else {
-        console.warn("❌ No third party data available");
+
       }
     } else {
-      console.warn("❌ Third party container not found");
+
     }
   }
   
   function populateCheckboxContainer(container, items, type) {
-    console.log(`🔧 populateCheckboxContainer called for ${type}:`);
-    console.log(`  - Container:`, container);
-    console.log(`  - Items count:`, items?.length || 0);
-    console.log(`  - Items:`, items);
-    console.log(`  - Type:`, type);
-    
+
     // Clear ALL existing checkboxes (no "Select All" needed)
       const existingItems = container.querySelectorAll('.bal-dropdown-link.select-category');
     existingItems.forEach(item => {
           item.remove();
       });
-    console.log(`🧹 Removed ${existingItems.length} existing checkboxes (including Select All)`);
-    
+
     // Note: We're not adding a "Select All" option anymore
       
       // Add new items from database
@@ -725,13 +704,10 @@
     }
     
   function setupThirdPartyEventHandlers(container) {
-    console.log("🔧 Setting up third party event handlers on existing content...");
-    console.log("📦 Container:", container);
-      
+
     // Find all existing checkbox links in the container
       const checkboxLinks = container.querySelectorAll('.bal-dropdown-link.select-category');
-    console.log(`📋 Found ${checkboxLinks.length} existing third party checkboxes`);
-      
+
     checkboxLinks.forEach((checkboxLink, index) => {
         const input = checkboxLink.querySelector('input[type="checkbox"]');
         const label = checkboxLink.querySelector('.bal-checkbox-label');
@@ -741,9 +717,7 @@
         
         // Update the input's data-name attribute to match the actual name
           input.dataset.name = thirdPartyName;
-          
-        console.log(`🔗 Setting up handler ${index + 1}: "${thirdPartyName}"`);
-        
+
         // Remove any existing event listeners by cloning the element
         const newCheckboxLink = checkboxLink.cloneNode(true);
         checkboxLink.parentNode.replaceChild(newCheckboxLink, checkboxLink);
@@ -769,28 +743,23 @@
               customCheckbox.classList.remove('w--redirected-checked');
             }
           }
-          
-          console.log(`📝 Third party checkbox clicked: ${thirdPartyName} - ${newInput.checked ? 'checked' : 'unchecked'}`);
-          
+
           // Call the mobile checkbox selection handler
           handleMobileCheckboxSelection('thirdparty', thirdPartyName, newInput);
         });
         
       } else {
-        console.warn(`⚠️ Missing input or label for checkbox ${index + 1}`);
+
       }
     });
-    
-    console.log("🎉 Third party event handlers setup complete");
+
   }
   
   function populateThirdPartyModal(container, thirdParties) {
-    console.log("🏗️ Populating third party modal with database data...");
-    console.log(`📊 Received ${thirdParties.length} third parties:`, thirdParties);
-    
+
     // Clear all existing checkboxes
     const existingItems = container.querySelectorAll('.bal-dropdown-link.select-category');
-    console.log(`🧹 Clearing ${existingItems.length} existing items`);
+
     existingItems.forEach(item => item.remove());
     
     // Filter out unwanted values: "N/A", null, undefined, empty strings, and whitespace-only strings
@@ -801,17 +770,14 @@
       if (trimmed.toLowerCase() === 'n/a') return false; // "N/A" values
       return true;
     });
-    
-    console.log(`📋 Filtered to ${validThirdParties.length} valid third parties (removed N/A and empty values)`);
-    
+
     // Add only valid third parties from database (no "Select All" option - we have the toggle for that)
     validThirdParties.forEach((thirdParty, index) => {
       const checkboxItem = createThirdPartyCheckbox(thirdParty, index + 1, false);
       container.appendChild(checkboxItem);
-      console.log(`✅ Added third party ${index + 1}: "${thirdParty}"`);
+
     });
-    
-    console.log(`🎉 Third party modal populated with ${validThirdParties.length} valid items (no Select All - using toggle instead)`);
+
   }
   
   function createThirdPartyCheckbox(thirdPartyName, index, isSelectAll) {
@@ -863,9 +829,7 @@
       } else {
         customCheckbox.classList.remove('w--redirected-checked');
       }
-      
-      console.log(`📝 Third party checkbox clicked: ${thirdPartyName} - ${input.checked ? 'checked' : 'unchecked'}`);
-      
+
       // Call the mobile checkbox selection handler
             handleMobileCheckboxSelection('thirdparty', thirdPartyName, input);
           });
@@ -874,26 +838,20 @@
     }
     
     function setupModalFooterButtons() {
-    
-      
+
       // Find all modals with data-id attributes
       const modals = document.querySelectorAll('[data-id]');
-    
-      
+
       modals.forEach(modal => {
         const modalId = modal.getAttribute('data-id');
         const footer = modal.querySelector('.filter-footer');
-        
-      
-        
+
         if (footer) {
           // Find ALL buttons in the footer, not just specific classes
           const allButtons = footer.querySelectorAll('button, a.w-button, .btn-clear, .filter-submit');
           const clearButtons = footer.querySelectorAll('.btn-clear');
           const applyButtons = footer.querySelectorAll('.filter-submit:not(.btn-clear)');
-          
-        
-          
+
           // Set up event listeners for all clear buttons
           clearButtons.forEach((clearButton, index) => {
           
@@ -940,8 +898,7 @@
               });
             }
           });
-          
-        
+
         }
         
         // Set up back button and close button
@@ -971,34 +928,20 @@
     }
     
     function handleModalClearAll(modalId) {
-    console.log(`🧹 CLEAR ALL FILTERS - triggered from modal: ${modalId}`);
-    console.log('📊 Current state before clearing:', {
-      selectedGroups: Array.from(state.selectedGroups),
-      selectedCategories: Array.from(state.selectedCategories),
-      selectedCodes: Array.from(state.selectedCodes),
-      selectedThirdParties: Array.from(state.selectedThirdParties),
-      selectedApprovalStages: Array.from(state.selectedApprovalStages),
-      selectedRiskRatings: Array.from(state.selectedRiskRatings),
-      fawriActivitiesOnly: state.fawriActivitiesOnly // Show FAWRI state but don't clear it
-    });
-    
+
     // CLEAR ALL FILTERS (except FAWRI toggle)
-    console.log("🧹 Clearing ALL filter types...");
-    
+
     // Clear all filter states
-    console.log("  ➖ Clearing groups");
+
           state.selectedGroups.clear();
           updateMobileCheckboxStates('group');
-    
-    console.log("  ➖ Clearing categories");
+
           state.selectedCategories.clear();
           updateMobileCheckboxStates('category');
-    
-    console.log("  ➖ Clearing codes");
+
           state.selectedCodes.clear();
           updateMobileCheckboxStates('code');
-    
-    console.log("  ➖ Clearing third parties");
+
           state.selectedThirdParties.clear();
           updateMobileCheckboxStates('thirdparty');
     
@@ -1007,12 +950,10 @@
       dom.thirdPartyToggle.checked = false;
       state.thirdPartyApproval = false;
     }
-    
-    console.log("  ➖ Clearing approval stages");
+
     state.selectedApprovalStages.clear();
     clearApprovalStageCheckboxes();
-    
-    console.log("  ➖ Clearing risk ratings");
+
     state.selectedRiskRatings.clear();
     clearRiskRatingCheckboxes();
     
@@ -1020,45 +961,110 @@
     state.currentCategory = '';
     state.currentGroup = '';
     
-    console.log("✅ All filters cleared (FAWRI toggle preserved)");
-    console.log('📊 State after clearing:', {
-      selectedGroups: Array.from(state.selectedGroups),
-      selectedCategories: Array.from(state.selectedCategories),
-      selectedCodes: Array.from(state.selectedCodes),
-      selectedThirdParties: Array.from(state.selectedThirdParties),
-      selectedApprovalStages: Array.from(state.selectedApprovalStages),
-      selectedRiskRatings: Array.from(state.selectedRiskRatings),
-      fawriActivitiesOnly: state.fawriActivitiesOnly // Should remain unchanged
-    });
-    
-    console.log("✅ Filters cleared, updating display and applying filters");
+   
+
       // Update display and apply filters
       updateMobileSortingDisplay();
       applyMobileFilters();
       
-      // Close the modal
-      closeFilterModal(modalId);
+      // Find the main modal container and close both sub and main
+      const subModal = document.querySelector(`[data-id="${modalId}"]`);
+      const mainModal = subModal ? subModal.closest('.bal-category-modal') : null;
+      
+      if (mainModal) {
+        // Use the new modal management system to close both sub and main modals
+        closeEntireModalFromId(mainModal);
+      } else {
+        // Fallback to old method if main modal not found
+        closeFilterModal(modalId);
+      }
+    }
+    
+    // Version of handleModalClearAll that doesn't close the modal (for use with modal management system)
+    function handleModalClearAllWithoutClosing(modalId) {
+      console.log('🧹 handleModalClearAllWithoutClosing called with modalId:', modalId);
+      
+      // CLEAR ALL FILTERS (except FAWRI toggle)
+      
+      // Clear all filter states
+      state.selectedGroups.clear();
+      updateMobileCheckboxStates('group');
+      
+      state.selectedCategories.clear();
+      updateMobileCheckboxStates('category');
+      
+      state.selectedCodes.clear();
+      updateMobileCheckboxStates('code');
+      
+      state.selectedThirdParties.clear();
+      updateMobileCheckboxStates('thirdparty');
+      
+      // Reset third party toggle
+      if (dom.thirdPartyToggle) {
+        dom.thirdPartyToggle.checked = false;
+        state.thirdPartyApproval = false;
+      }
+      
+      state.selectedApprovalStages.clear();
+      clearApprovalStageCheckboxes();
+      
+      state.selectedRiskRatings.clear();
+      clearRiskRatingCheckboxes();
+      
+      // Clear desktop category/group selections too
+      state.currentCategory = '';
+      state.currentGroup = '';
+      
+      // Update display and apply filters
+      console.log('🧹 Updating display and applying filters...');
+      updateMobileSortingDisplay();
+      applyMobileFilters();
+      console.log('🧹 Clear operation completed!');
     }
     
     function handleModalApply(modalId) {
-    
-      
       // Apply filters
       applyMobileFilters();
       
-      // Close the modal
-      closeFilterModal(modalId);
+      // Find the main modal container
+      const subModal = document.querySelector(`[data-id="${modalId}"]`);
+      const mainModal = subModal ? subModal.closest('.bal-category-modal') : null;
+      
+      if (mainModal) {
+        // Use the new modal management system to close both sub and main modals
+        closeEntireModalFromId(mainModal);
+      } else {
+        // Fallback to old method if main modal not found
+        closeFilterModal(modalId);
+      }
+    }
+    
+    // Helper function to close entire modal (accessible from outside setupModalManagement)
+    function closeEntireModalFromId(mainModal) {
+      // Close all sub modals first
+      const allSubModals = mainModal.querySelectorAll('.filter-group-slide');
+      allSubModals.forEach(sub => {
+        sub.classList.remove('is-open');
+        sub.classList.add('is-closed');
+        // DON'T set permanent inline styles - let CSS handle visibility
+      });
+      
+      // Close main modal
+      mainModal.classList.remove('is-open');
+      mainModal.classList.add('is-closed');
+      // DON'T set permanent inline styles - let CSS handle visibility
+      
+      // Update mobile sorting display after closing
+      updateMobileSortingDisplay();
     }
     
     function closeFilterModal(modalId) {
-    
-      
+
       // Find the modal element by data-id
       const modal = document.querySelector(`[data-id="${modalId}"]`);
       
       if (modal) {
-      
-        
+
         // Try multiple approaches to close the modal
         
         // 1. Remove the is-open class
@@ -1092,9 +1098,7 @@
         
         // 8. Try to trigger a custom event that Webflow might be listening for
         modal.dispatchEvent(new CustomEvent('closeModal', { bubbles: true }));
-        
-      
-        
+
         // Optional: Add a small delay before showing the main filter interface
         setTimeout(() => {
           // Force hide again after a delay
@@ -1104,30 +1108,27 @@
         
         }, 100);
       } else {
-        console.warn(`Modal with data-id="${modalId}" not found`);
+
       }
     }
     
     function setupModalButtonDelegation() {
-    console.log('🚀 Setting up modal button delegation...');
-      
+
     // CRITICAL: Add this event listener with capture=true to catch events BEFORE other handlers
       document.addEventListener('click', (e) => {
       // Check if clicked element is a clear button FIRST
       if (e.target.matches('.btn-clear') || e.target.closest('.btn-clear')) {
-        console.log('🚨 PRIORITY: Clear button clicked! (captured early)');
+
         e.preventDefault();
         e.stopPropagation();
         
         const button = e.target.matches('.btn-clear') ? e.target : e.target.closest('.btn-clear');
         
-        // Debug: Show the DOM hierarchy to understand the structure
-        console.log('🔍 Clear button:', button);
-        console.log('🔍 Button parent elements:');
+
         let parent = button.parentElement;
         let level = 1;
         while (parent && level <= 8) {
-          console.log(`  Level ${level}:`, parent.tagName, parent.className, parent.getAttribute('data-id'));
+
           parent = parent.parentElement;
           level++;
         }
@@ -1148,17 +1149,14 @@
           // Try finding any parent with filter-related or modal classes
           modal = button.closest('[class*="filter-"], [class*="modal"], .bal-category, .bal-group, .bal-code');
         }
-        
-        console.log('🔍 Modal found:', modal);
-        
+
         if (modal) {
           modalId = modal.getAttribute('data-id');
           
           // If no data-id, try to infer from class names
           if (!modalId) {
             const classList = Array.from(modal.classList);
-            console.log('🔍 Modal classes:', classList);
-            
+
             // Try to determine modal type from classes - be more specific
             if (classList.some(c => c.includes('group'))) {
               modalId = 'group';
@@ -1169,18 +1167,17 @@
             } else if (classList.some(c => c.includes('third'))) {
               modalId = 'thirdparty';
             }
-            
-            console.log('🔍 Inferred modal ID:', modalId);
+
           }
           
           if (modalId) {
-            console.log('🔍 Final modal ID:', modalId);
+
             handleModalClearAll(modalId);
           } else {
-            console.warn('❌ Could not determine modal ID');
+
           }
         } else {
-          console.warn('❌ No modal found for clear button');
+
         }
         return false; // Stop all further processing
       }
@@ -1190,32 +1187,25 @@
     document.addEventListener('click', (e) => {
       // Only log if it's a button or link to reduce noise
       if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('a, button')) {
-        console.log('🖱️ Button/Link click detected:', e.target);
-        console.log('🔍 Target tag:', e.target.tagName);
-        console.log('🔍 Target classes:', e.target.className);
-        console.log('🔍 Target text:', e.target.textContent?.trim());
-        console.log('🔍 Closest modal:', e.target.closest('[data-id]'));
+
+
       }
       
         // Check if clicked element is a clear button
         if (e.target.matches('.btn-clear') || e.target.closest('.btn-clear')) {
-        console.log('✅ Clear button clicked!');
+
           e.preventDefault();
           e.stopPropagation();
           
           const button = e.target.matches('.btn-clear') ? e.target : e.target.closest('.btn-clear');
           const modal = button.closest('[data-id]');
-        
-        console.log('🔍 Clear button:', button);
-        console.log('🔍 Modal found:', modal);
-          
+
           if (modal) {
             const modalId = modal.getAttribute('data-id');
-          console.log('🔍 Modal ID:', modalId);
-          
+
             handleModalClearAll(modalId);
         } else {
-          console.warn('❌ No modal found for clear button');
+
           }
           return;
         }
@@ -1268,37 +1258,29 @@
           return;
         }
       });
-      
-    
+
     }
     
     function preventModalFormSubmissions() {
-    
-      
+
       // DIRECT APPROACH: Find all filter footers and attach listeners to their buttons
       const filterFooters = document.querySelectorAll('.filter-footer');
-    
-      
+
       filterFooters.forEach((footer, index) => {
-      
-        
+
         // Find all buttons in this footer
         const allButtons = footer.querySelectorAll('a.w-button, a.filter-submit, button');
-      
-        
+
         // Set up listeners for each button
         allButtons.forEach((button, btnIndex) => {
           const buttonText = button.textContent.trim();
           const buttonClasses = button.className;
-        
-          
+
           // Attach click listener
           button.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
-          
-            
+
             // Find the modal this button belongs to
             const modal = button.closest('[data-id]');
             if (modal) {
@@ -1306,12 +1288,10 @@
               
               // Handle based on button text
               if (buttonText.toLowerCase().includes('clear')) {
-              
-                
+
                 // DIRECT APPROACH: Clear all checkboxes in this modal
                 const checkboxItems = modal.querySelectorAll('.bal-dropdown-link.select-category');
-              
-                
+
                 checkboxItems.forEach((item, idx) => {
                   const input = item.querySelector('input[type="checkbox"]');
                   const customCb = item.querySelector('.w-checkbox-input');
@@ -1342,8 +1322,7 @@
                 closeFilterModal(modalId);
                 
               } else if (buttonText.toLowerCase().includes('apply')) {
-              
-                
+
                 // Just close the modal - filters are already applied when checkboxes are clicked
                 closeFilterModal(modalId);
               }
@@ -1356,11 +1335,9 @@
       
       // Also handle forms (as a backup)
       const modalForms = document.querySelectorAll('[data-id] form');
-    
-      
+
       modalForms.forEach((form, index) => {
-      
-        
+
         form.addEventListener('submit', (e) => {
         
           e.preventDefault();
@@ -1410,9 +1387,7 @@
               const modalId = modal.getAttribute('data-id');
               const buttonText = button.textContent.trim();
               const buttonClasses = button.className;
-              
-            
-              
+
               if (button.matches('.btn-clear') || buttonText.toLowerCase().includes('clear')) {
               
                 handleModalClearAll(modalId);
@@ -1428,13 +1403,11 @@
           }
         }
       });
-      
-    
+
     }
     
     function setupMobileSortingTabs() {
-    
-      
+
       // Update tab display text based on current state
       updateMobileSortingDisplay();
       
@@ -1482,49 +1455,70 @@
       tab.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
-        console.log(`🔍 Filter tab clicked: ${modalId}`);
+
         openFilterModal(modalId);
       });
     });
   }
   
   function openFilterModal(modalId) {
-    console.log(`📂 Opening filter modal: ${modalId}`);
+    // Find the sub-modal element by data-id
+    const subModal = document.querySelector(`[data-id="${modalId}"]`);
     
-    // Find the modal element by data-id
-    const modal = document.querySelector(`[data-id="${modalId}"]`);
-    
-    if (modal) {
-      console.log(`✅ Found modal for ${modalId}:`, modal);
+    if (subModal) {
+      // Find the main modal container
+      const mainModal = subModal.closest('.bal-category-modal');
       
-      // Remove is-closed class if present
-      modal.classList.remove('is-closed');
-      
-      // Add is-open class
-      modal.classList.add('is-open');
-      
-      // CRITICAL FIX: Clear any inline styles that might be hiding the modal
-      modal.style.display = '';
-      modal.style.visibility = '';
-      modal.style.opacity = '';
+      if (mainModal) {
+        // First, open the main modal
+        mainModal.classList.remove('is-closed');
+        mainModal.classList.add('is-open');
+        // Clear any inline styles that might be hiding the main modal
+        mainModal.style.display = '';
+        mainModal.style.visibility = '';
+        mainModal.style.opacity = '';
         
-      // Also try to trigger any Webflow interactions
-      const overlay = modal.querySelector('.filter-slide-overlay');
-      if (overlay) {
-        overlay.style.display = '';
-        overlay.style.opacity = '';
+        // Then open the specific sub-modal
+        // Close any other open sub-modals first
+        const allSubModals = mainModal.querySelectorAll('.filter-group-slide');
+        allSubModals.forEach(sub => {
+          sub.classList.remove('is-open');
+          sub.classList.add('is-closed');
+          // DON'T set permanent inline styles - let CSS handle it
+        });
+        
+        // Open the requested sub-modal
+        subModal.classList.remove('is-closed');
+        subModal.classList.add('is-open');
+        subModal.style.display = '';
+        subModal.style.visibility = '';
+        subModal.style.opacity = '';
+        
+        // Also try to trigger any Webflow interactions
+        const overlay = subModal.querySelector('.filter-slide-overlay');
+        if (overlay) {
+          overlay.style.display = '';
+          overlay.style.opacity = '';
+        }
+      } else {
+        // Fallback: old method if no main modal container found
+        subModal.classList.remove('is-closed');
+        subModal.classList.add('is-open');
+        subModal.style.display = '';
+        subModal.style.visibility = '';
+        subModal.style.opacity = '';
+        
+        const overlay = subModal.querySelector('.filter-slide-overlay');
+        if (overlay) {
+          overlay.style.display = '';
+          overlay.style.opacity = '';
+        }
       }
-      
-      console.log(`🎉 Modal ${modalId} opened successfully`);
-    } else {
-      console.error(`❌ Could not find modal with data-id="${modalId}"`);
     }
   }
     
     function updateMobileSortingDisplay() {
-    
-      
+
       // Update Group tab using data-modal="group"
       const groupTab = document.querySelector('[data-modal="group"]');
       if (groupTab) {
@@ -1550,26 +1544,25 @@
         const categorySelect = categoriesTab.querySelector('.filter-tab-click-select');
         if (categorySelect) {
           const categoryCount = state.selectedCategories.size;
-        console.log(`📊 Categories tab update: count=${categoryCount}, items=`, Array.from(state.selectedCategories));
-        
+
           if (categoryCount > 0) {
             const selectedItems = Array.from(state.selectedCategories);
             if (categoryCount === 1) {
               categorySelect.textContent = selectedItems[0];
-            console.log(`✅ Categories tab set to single item: "${selectedItems[0]}"`);
+
             } else {
               categorySelect.textContent = `${categoryCount} Categories`;
-            console.log(`✅ Categories tab set to count: "${categoryCount} Categories"`);
+
             }
           } else {
             categorySelect.textContent = 'All Categories';
-          console.log(`✅ Categories tab set to default: "All Categories"`);
+
           }
       } else {
-        console.warn('❌ Categories tab select element not found');
+
         }
     } else {
-      console.warn('❌ Categories tab not found');
+
       }
       
       // Update Code tab using data-modal="code"
@@ -1614,35 +1607,23 @@
     }
     
     function handleMobileCheckboxSelection(type, item, checkbox) {
-    console.log(`🔍 Mobile checkbox selection: ${type} = ${item}`);
-    
+
     // Debug: Check which container this checkbox belongs to
     const container = checkbox.closest('.bal-dropdown-checkbox-wrap.select-listing');
     const modal = checkbox.closest('[data-id]');
     const modalId = modal?.getAttribute('data-id');
-    
-    console.log(`🏠 Container debug:`, {
-      modalId: modalId,
-      passedType: type,
-      itemName: item,
-      containerElement: container,
-      modalElement: modal
-    });
-    
+
     // Additional debug: Check if the type matches the modal
     if (modalId && modalId !== type) {
-      console.error(`🚨 TYPE MISMATCH: Passed type '${type}' but checkbox is in modal with data-id='${modalId}'`);
-      console.log(`🔧 Correcting type from '${type}' to '${modalId}'`);
+      
+
       type = modalId; // Fix the type based on the actual modal
     }
       
       // Get the current state of the checkbox
       const isChecked = checkbox.checked;
       const customCheckbox = checkbox.closest('label')?.querySelector('.w-checkbox-input');
-      
-      console.log(`Checkbox state: checked=${isChecked}, customCheckbox=${!!customCheckbox}`);
-      
-    
+
     // Note: "Select All" functionality removed - no longer needed
     
     // Handle individual item selection (multi-select)
@@ -1660,19 +1641,13 @@
       if (isChecked) {
         // Add to selection
         selectedSet.add(item);
-      console.log(`➕ Added "${item}" to ${type} selection`);
-      console.log(`📊 selectedSet after add:`, Array.from(selectedSet));
-      console.log(`📊 state.selectedCategories after add:`, Array.from(state.selectedCategories));
+
       } else {
         // Remove from selection
         selectedSet.delete(item);
-      console.log(`➖ Removed "${item}" from ${type} selection`);
-      console.log(`📊 selectedSet after remove:`, Array.from(selectedSet));
-      console.log(`📊 state.selectedCategories after remove:`, Array.from(state.selectedCategories));
+
     }
-    
-    console.log(`📊 Current ${type} selection:`, Array.from(selectedSet));
-    
+
     // Note: No "Select All" to uncheck anymore
       
       // Update display and apply filters
@@ -1699,30 +1674,28 @@
         default: 
           container = null;
       }
-      
-    
-      
+
       return container;
     }
     
     function getSelectedSetByType(type) {
-    console.log(`🔍 getSelectedSetByType called with type: "${type}"`);
+
       switch (type) {
       case 'group': 
-        console.log(`📊 Returning selectedGroups:`, Array.from(state.selectedGroups));
+
         return state.selectedGroups;
       case 'category':
       case 'categories': // Handle both singular and plural
-        console.log(`📊 Returning selectedCategories:`, Array.from(state.selectedCategories));
+
         return state.selectedCategories;
       case 'code': 
-        console.log(`📊 Returning selectedCodes:`, Array.from(state.selectedCodes));
+
         return state.selectedCodes;
       case 'thirdparty': 
-        console.log(`📊 Returning selectedThirdParties:`, Array.from(state.selectedThirdParties));
+
         return state.selectedThirdParties;
       default: 
-        console.warn(`⚠️ Unknown type "${type}", returning empty Set`);
+
         return new Set();
       }
     }
@@ -1738,31 +1711,26 @@
     }
     
     function applyMobileFilters() {
-    
-      
+
       // Reset to first page and reload data
       state.currentPage = 1;
       renderPage(1);
     }
     
     function updateMobileCheckboxStates(type) {
-    
-      
+
       const container = getContainerByType(type);
-    
-      
+
       if (!container) {
-        console.warn(`❌ No container found for type: ${type}`);
+
         return;
       }
       
       const selectedSet = getSelectedSetByType(type);
-    
-      
+
       // Find all checkbox items (not just the input elements)
       const allCheckboxItems = container.querySelectorAll('.bal-dropdown-link.select-category');
-    
-      
+
       // Clear all checkboxes (Webflow specific)
       allCheckboxItems.forEach((checkboxItem, index) => {
         const input = checkboxItem.querySelector('input[type="checkbox"]');
@@ -1770,10 +1738,9 @@
         const itemName = input?.dataset?.name;
         
         // Log what we found
-      
-        
+
         if (!input || !customCheckbox) {
-          console.warn(`⚠️ Missing input or custom checkbox for item ${index}`);
+
           return;
         }
         
@@ -1795,16 +1762,13 @@
         } else {
           customCheckbox.classList.remove('w--redirected-checked');
         }
-        
-      
+
       });
-      
-    
+
     }
     
     function handleMobileSortingSelection(type, selectedItem) {
-    
-      
+
       switch (type) {
         case 'group':
           const newGroup = selectedItem === 'All Groups' ? '' : selectedItem;
@@ -1852,7 +1816,6 @@
           .not('Group', 'is', null);
         
         if (error) {
-          // console.error("Error fetching groups:", error);
           return [];
         }
         
@@ -1865,7 +1828,6 @@
         
         return groups;
       } catch (error) {
-        // console.error("Error in fetchGroups:", error);
         return [];
       }
     }
@@ -1901,7 +1863,6 @@
       }
       
       if (!groupContainer) {
-        // console.warn("Group container not found with any selector");
         
         // Debug: Log all potential containers
   ("All available tab panes:");
@@ -2000,8 +1961,7 @@
     ("'All Groups' not active, current group is:", state.currentGroup);
           allGroupsButton.classList.remove('is-active');
         }
-      } else {
-        // console.warn("All Groups button not found");
+      } else {  
       }
       
 (`Added ${groups.length} group buttons to container:`, groupContainer);
@@ -2054,13 +2014,13 @@
           // Also try immediately in case DOM is already ready
           populateGroupButtons(groups);
         } else {
-          // console.warn("No groups found in the database");
+          // 
         }
         
         // Fetch all unique categories and groups from the database
         const { data, error } = await supabase.from('Activity List').select('Category, Group');
         if (error) {
-          // console.error("Error fetching categories:", error);
+          // 
           return;
         }
   
@@ -2076,7 +2036,7 @@
         setupCategoryEventListeners();
         
       } catch (error) {
-        // console.error("Error in initCategoryRadios:", error);
+        // 
       }
     }
   
@@ -2085,7 +2045,7 @@
       const categoryContainer = document.querySelector('.bal-category-lists:nth-child(1)');
       
       if (!categoryContainer) {
-        // console.warn("Category container not found");
+        // 
         return;
       }
       
@@ -2104,7 +2064,7 @@
     
     function clearExistingItems(container, keepText) {
       if (!container) {
-        // console.warn("Cannot clear items: container is null or undefined");
+        // 
         return;
       }
       
@@ -2204,9 +2164,7 @@
   
     function handleCategoryChange(newCategory) {
       if (state.currentCategory === newCategory) return;
-      
-    
-      
+
       state.currentCategory = newCategory;
       state.currentGroup = ''; // Reset group when changing category
       
@@ -2220,9 +2178,7 @@
     
     function handleGroupChange(newGroup) {
       if (state.currentGroup === newGroup) return;
-      
-    
-      
+
       state.currentGroup = newGroup;
       state.currentCategory = ''; // Reset category when changing group
       
@@ -2336,13 +2292,13 @@
       
       // Apply third party approval filter if enabled
       if (thirdPartyApproval) {
-      console.log("🔍 Applying third party approval filter");
+
         query = query.not('Third Party', 'is', null);
       }
       
       // Apply specific third party filters if any are selected
       if (selectedThirdParties.size > 0) {
-      console.log(`🎯 Filtering by specific third parties:`, Array.from(selectedThirdParties));
+
         query = query.in('Third Party', Array.from(selectedThirdParties));
       }
       
@@ -2364,8 +2320,7 @@
     
     // Apply approval stage filters if any are selected
     if (selectedApprovalStages.size > 0) {
-      console.log(`🔍 Filtering by approval stages:`, Array.from(selectedApprovalStages));
-      
+
       // Convert UI values to API values and handle null case
       const apiValues = Array.from(selectedApprovalStages).map(stage => {
         switch (stage) {
@@ -2394,8 +2349,7 @@
     
     // Apply risk rating filters if any are selected
     if (selectedRiskRatings.size > 0) {
-      console.log(`🎯 Filtering by risk ratings:`, Array.from(selectedRiskRatings));
-      
+
       // Convert UI values to API values
       const apiValues = Array.from(selectedRiskRatings).map(rating => {
         switch (rating) {
@@ -2403,8 +2357,7 @@
           default: return rating; // Low, Medium, High stay the same
         }
       });
-      
-      console.log(`🔄 Converted risk ratings to API values:`, apiValues);
+
       query = query.in('Risk Rating', apiValues);
     }
       
@@ -2476,7 +2429,7 @@
           (`Applied ${operator} filter with regular field: ${field}, value: ${processedValue}`);
               }
             } catch (filterError) {
-              // console.error(`Error applying ${operator} filter for "${field}":`, filterError);
+              // 
             }
           } else if (filter.includes(',')) {
             // OR condition
@@ -2485,10 +2438,10 @@
             query = query.or(filter);
         ("OR filter applied successfully");
             } catch (orError) {
-              // console.error(`Error applying OR filter for "${filter}":`, orError);
+              // 
             }
           } else {
-            // console.warn(`Unrecognized filter format: "${filter}"`);
+            // 
           }
         });
       }
@@ -2526,7 +2479,7 @@
         });
       
       if (error) {
-          // console.error("Supabase query error:", error);
+          // 
         hideLoader();
           hideBottomLoader();
           return; // Exit early on error
@@ -2544,8 +2497,8 @@
           return;
         }
       } catch (queryError) {
-        // console.error("Exception during Supabase query execution:", queryError);
-        // console.error(queryError.stack);
+        // 
+        // 
         hideLoader();
         hideBottomLoader();
           
@@ -2574,8 +2527,8 @@
       cache.set(cacheKey, data, count);
         renderResults(data, page, count, append);
       } catch (err) {
-        // console.error("Error in renderPage:", err);
-        // console.error(err.stack);
+          // 
+        // 
         hideLoader();
         hideBottomLoader();
         
@@ -2648,10 +2601,10 @@
       
       // Verify container elements are valid based on view type
       if (isMobile && !dom.mobileListEl) {
-        console.warn("Mobile container element is missing when trying to render mobile results");
+
         return;
       } else if (!isMobile && !dom.tableBodyEl) {
-        console.warn("Table body element is missing when trying to render desktop results");
+
         return;
       }
       
@@ -2671,8 +2624,7 @@
       if (data?.length > 0) {
       
         data.forEach((item, index) => {
-        
-          
+
           if (isMobile) {
             // Render mobile version
             const mobileItem = createMobileItem(item);
@@ -2742,7 +2694,7 @@
                 }, 1000);
               })
               .catch(err => {
-                // console.error('Failed to copy text: ', err);
+                // 
               });
           });
           
@@ -2851,7 +2803,7 @@
         dom.tableBodyEl.appendChild(noResultsRow);
           
         } catch (err) {
-            console.error("Error appending no results message:", err);
+            // 
           }
         }
       }
@@ -2983,22 +2935,18 @@
       
       return modalEl;
     }
-  
-  
+
     // ─── Search Functionality ──────────────────────────────────────
   
     function setupSearch() {
-    
-      
+
       // Set up all search inputs (desktop and mobile)
       if (dom.searchInputs && dom.searchInputs.length > 0) {
-      
-        
+
         // Set up search-on-type with debounce for all search inputs
         const handleSearchInput = debounce((event) => {
           const searchTerm = event.target.value.trim();
-          
-        
+
           state.searchTerm = searchTerm;
           state.currentPage = 1;
           renderPage(1);
@@ -3013,8 +2961,7 @@
         
         // Attach event listeners to all search inputs
         dom.searchInputs.forEach((searchInput, index) => {
-        
-          
+
           // Attach search-on-type event listener
           searchInput.addEventListener('input', handleSearchInput);
           
@@ -3025,8 +2972,7 @@
               
               // Trigger search manually on Enter
               const searchTerm = searchInput.value.trim();
-            
-              
+
             state.searchTerm = searchTerm;
             state.currentPage = 1;
             renderPage(1);
@@ -3044,8 +2990,7 @@
       
       // Set up main search form to prevent submission
       if (dom.searchForm) {
-      
-        
+
         // Prevent form submission - use capture phase to ensure it's caught early
         dom.searchForm.addEventListener('submit', (event) => {
         
@@ -3054,13 +2999,11 @@
           
           // Find the search input directly within the form
           const searchInput = event.target.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-        
-          
+
           // Trigger search manually
           if (searchInput) {
             const searchTerm = searchInput.value.trim();
-          
-            
+
             state.searchTerm = searchTerm;
             state.currentPage = 1;
             renderPage(1);
@@ -3085,8 +3028,7 @@
         
       // Set up search submit buttons
         if (dom.searchSubmitBtn) {
-      
-          
+
           // Remove any existing click listeners
           const newSubmitBtn = dom.searchSubmitBtn.cloneNode(true);
           if (dom.searchSubmitBtn.parentNode) {
@@ -3429,7 +3371,7 @@
       });
       
       if (!columnToggleBtn || !columnDropdown || !columnItems.length) {
-        // console.warn("Column toggle elements not found, skipping setup");
+        // 
         return;
       }
       
@@ -3480,7 +3422,7 @@
         // Find the column index from our mapping
         const columnData = columnMapping[columnName];
         if (!columnData) {
-          // console.warn(`No mapping found for column "${columnName}"`);
+          // 
           return;
         }
         
@@ -3528,13 +3470,13 @@
     function createColumnMapping() {
       const tableEl = document.querySelector('table.table_component, #bal-table');
       if (!tableEl) {
-        // console.error("Table element not found for column mapping");
+        // 
         return {};
       }
       
       const headerRow = tableEl.querySelector('tr');
       if (!headerRow) {
-        // console.error("Header row not found for column mapping");
+        // 
         return {};
       }
       
@@ -3574,7 +3516,7 @@
       // Second pass: check for missing expected columns and provide fallback mapping
       expectedColumns.forEach((columnName, index) => {
         if (!mapping[columnName]) {
-          // console.warn(`Expected column "${columnName}" not found in header. Using fallback position.`);
+          // 
           
           // Try to find a header cell that might contain this column
           const matchingCell = Array.from(headerCells).find(cell => {
@@ -3619,7 +3561,7 @@
       // Get the table element directly
       const tableEl = document.querySelector('table.table_component, #bal-table');
       if (!tableEl) {
-        // console.error("Table element not found for column visibility toggle");
+        // 
         return;
       }
       
@@ -3630,7 +3572,7 @@
       let styleEl = document.getElementById(styleId);
       
       if (!styleEl && !isVisible) {
-        // Create a style element if it doesn't exist and we're hiding a column
+        // 
         styleEl = document.createElement('style');
         styleEl.id = styleId;
         document.head.appendChild(styleEl);
@@ -3784,7 +3726,6 @@
         }
       }
       
-      // console.warn(`Could not find column "${columnName}" using any approach`);
     }
     
     // Helper function to apply visibility to cells
@@ -3836,7 +3777,7 @@
       try {
         return JSON.parse(localStorage.getItem('savedActivities') || '[]');
       } catch (error) {
-        // console.error('Error parsing saved activities:', error);
+        // 
         return [];
       }
     }
@@ -3850,7 +3791,7 @@
         // Update saved items count if element exists
         updateSavedItemsCount(activities.length);
       } catch (error) {
-        // console.error('Error saving activities:', error);
+        // 
       }
     }
     
@@ -3923,8 +3864,7 @@
     
     // Render saved items in both mobile and desktop views
     function renderSavedItems() {
-    
-      
+
       // Re-query the DOM in case it wasn't available during initialization
       if (!dom.savedTableBody) {
       
@@ -3940,8 +3880,7 @@
       }
       
       const savedActivities = getSavedActivities();
-    
-      
+
       // Clear both desktop table and mobile container
       if (dom.savedTableBody) {
       
@@ -4039,7 +3978,7 @@
                 }, 1000);
               })
               .catch(err => {
-                // console.error('Failed to copy text:', err);
+                  // 
               });
           });
           
@@ -4128,7 +4067,7 @@
           .not('"Third Party"', 'is', null);
         
         if (error) {
-          // console.error("Error fetching third parties:", error);
+          // 
           return [];
         }
         
@@ -4141,7 +4080,7 @@
         
         return thirdParties;
       } catch (error) {
-        // console.error("Error in fetchThirdParties:", error);
+        // 
         return [];
       }
     }
@@ -4211,7 +4150,7 @@
       }
       
       if (!checkboxContainer) {
-        // console.warn("Third party checkbox container not found with any selector");
+        // 
         
         // As a last resort, find the dropdown and create the structure
         const dropdown = document.querySelector('.bal-select-items-wrap');
@@ -4221,7 +4160,7 @@
           checkboxContainer.className = 'bal-dropdown-checkbox-wrap';
           dropdown.appendChild(checkboxContainer);
         } else {
-          // console.error("Could not find any suitable container for checkboxes");
+            // 
           return;
         }
       }
@@ -4269,44 +4208,36 @@
   
   // Set up approval stage filter checkboxes
   function setupApprovalStageFilter() {
-    console.log("🎯 Setting up approval stage filter...");
-    
+
     // Find the approval stage checkboxes container
     const approvalStageContainer = document.querySelector('.filter-when .bal-dropdown-checkbox-wrap');
     
     if (!approvalStageContainer) {
-      console.warn("❌ Approval stage container not found");
+
       return;
     }
-    
-    console.log("✅ Found approval stage container:", approvalStageContainer);
-    
+
     // Find all checkboxes in the approval stage container
     const checkboxes = approvalStageContainer.querySelectorAll('input[type="checkbox"]');
-    
-    console.log(`📋 Found ${checkboxes.length} approval stage checkboxes`);
-    
+
     // Set up event listeners for each checkbox
     checkboxes.forEach((checkbox, index) => {
       const label = checkbox.nextElementSibling;
       const stageName = label ? label.textContent.trim() : `Stage ${index + 1}`;
-      
-      console.log(`🔗 Setting up listener for: "${stageName}"`);
-      
+
       checkbox.addEventListener('change', (event) => {
-        console.log(`📝 Approval stage checkbox changed: ${stageName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
-        
+
         if (event.target.checked) {
           // Add to selected approval stages
           state.selectedApprovalStages.add(stageName);
-          console.log(`➕ Added "${stageName}" to approval stages`);
+
         } else {
           // Remove from selected approval stages
           state.selectedApprovalStages.delete(stageName);
-          console.log(`➖ Removed "${stageName}" from approval stages`);
+
         }
         
-        console.log("📊 Current selected approval stages:", Array.from(state.selectedApprovalStages));
+        // 
         
         // Reset to first page and reload data
         state.currentPage = 1;
@@ -4314,12 +4245,11 @@
         renderPage(1);
       });
     });
-    
-    console.log("🎉 Approval stage filter setup complete");
+
   }
 
   function clearApprovalStageCheckboxes() {
-    console.log("🧹 Clearing approval stage checkboxes...");
+
     const approvalStageContainer = document.querySelector('.filter-when .bal-dropdown-checkbox-wrap');
     if (!approvalStageContainer) return;
 
@@ -4333,49 +4263,41 @@
         customCheckbox.classList.remove('w--redirected-checked');
       }
     });
-    console.log("✅ Approval stage checkboxes cleared");
+
   }
 
   // Set up risk rating filter checkboxes
   function setupRiskRatingFilter() {
-    console.log("🎯 Setting up risk rating filter...");
-    
+
     // Find the risk rating checkboxes container
     const riskRatingContainer = document.querySelector('.filter-risk .bal-dropdown-checkbox-wrap');
     
     if (!riskRatingContainer) {
-      console.warn("❌ Risk rating container not found");
+
       return;
     }
-    
-    console.log("✅ Found risk rating container:", riskRatingContainer);
-    
+
     // Find all checkboxes in the risk rating container
     const checkboxes = riskRatingContainer.querySelectorAll('input[type="checkbox"]');
-    
-    console.log(`📋 Found ${checkboxes.length} risk rating checkboxes`);
-    
+
     // Set up event listeners for each checkbox
     checkboxes.forEach((checkbox, index) => {
       const label = checkbox.nextElementSibling;
       const ratingName = label ? label.textContent.trim() : `Rating ${index + 1}`;
-      
-      console.log(`🔗 Setting up listener for: "${ratingName}"`);
-      
+
       checkbox.addEventListener('change', (event) => {
-        console.log(`📝 Risk rating checkbox changed: ${ratingName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
-        
+
         if (event.target.checked) {
           // Add to selected risk ratings
           state.selectedRiskRatings.add(ratingName);
-          console.log(`➕ Added "${ratingName}" to risk ratings`);
+
         } else {
           // Remove from selected risk ratings
           state.selectedRiskRatings.delete(ratingName);
-          console.log(`➖ Removed "${ratingName}" from risk ratings`);
+
         }
         
-        console.log("📊 Current selected risk ratings:", Array.from(state.selectedRiskRatings));
+        // 
         
         // Reset to first page and reload data
         state.currentPage = 1;
@@ -4383,12 +4305,11 @@
         renderPage(1);
       });
     });
-    
-    console.log("🎉 Risk rating filter setup complete");
+
   }
 
   function clearRiskRatingCheckboxes() {
-    console.log("🧹 Clearing risk rating checkboxes...");
+
     const riskRatingContainer = document.querySelector('.filter-risk .bal-dropdown-checkbox-wrap');
     if (!riskRatingContainer) return;
 
@@ -4402,30 +4323,27 @@
         customCheckbox.classList.remove('w--redirected-checked');
       }
     });
-    console.log("✅ Risk rating checkboxes cleared");
+
   }
 
   // Set up mobile filter modal search inputs to work like th-search
   function setupMobileFilterSearch() {
-    console.log('🔍 Setting up mobile filter search inputs...');
-    
+
     // First, find all mobile filter modal containers
     const mobileFilterModals = document.querySelectorAll('.filter-modal-mob');
-    console.log(`📋 Found ${mobileFilterModals.length} mobile filter modal containers`);
-    
+
     // Check each container for search inputs, create if missing
     mobileFilterModals.forEach((modalContainer, index) => {
       const balSearchContainer = modalContainer.querySelector('.bal-search');
       if (!balSearchContainer) {
-        console.log(`⚠️ Modal ${index + 1}: No .bal-search container found`);
+
         return;
       }
       
       let searchInput = balSearchContainer.querySelector('input[type="text"]');
       
       if (!searchInput) {
-        console.log(`🔧 Modal ${index + 1}: Creating missing search input`);
-        
+
         // Create the missing input element
         searchInput = document.createElement('input');
         searchInput.className = 'bal-search-input search-group w-input';
@@ -4458,17 +4376,15 @@
         } else {
           balSearchContainer.appendChild(searchInput);
         }
-        
-        console.log(`✅ Modal ${index + 1}: Created search input for ${modalId} with placeholder: "${searchInput.placeholder}"`);
+
       } else {
-        console.log(`✅ Modal ${index + 1}: Found existing search input with placeholder: "${searchInput.placeholder}"`);
+
       }
     });
     
     // Now find all mobile filter search inputs (including newly created ones)
     const mobileSearchInputs = document.querySelectorAll('.filter-modal-mob input[type="text"], .bal-search-input');
-    console.log(`📋 Total mobile filter search inputs: ${mobileSearchInputs.length}`);
-    
+
     mobileSearchInputs.forEach((searchInput, index) => {
       // Try multiple ways to find the modal container
       let modal = searchInput.closest('[data-id]');
@@ -4485,25 +4401,11 @@
           modalId = modal?.getAttribute('data-id');
         }
       }
-      
-      console.log(`🔗 Setting up search input ${index + 1}:`, {
-        placeholder: searchInput.placeholder,
-        modalId: modalId,
-        modal: modal,
-        filterModalContainer: searchInput.closest('.filter-modal-mob'),
-        input: searchInput
-      });
-      
+
       // Determine what type of filter this is based on modal ID first (more reliable)
       let filterType = 'unknown';
       const placeholder = searchInput.placeholder.toLowerCase();
-      
-      console.log(`🔍 Detection debug:`, {
-        modalId: modalId,
-        placeholder: placeholder,
-        inputClasses: searchInput.className
-      });
-      
+
       // Prioritize modal ID over placeholder (more reliable)
       if (modalId === 'group') {
         filterType = 'group';
@@ -4525,18 +4427,15 @@
           filterType = 'thirdparty';
         }
       }
-      
-      console.log(`📊 Detected filter type: ${filterType} (based on modalId: ${modalId})`);
-      
+
       // Set up real-time search with debouncing (like th-search)
       const handleFilterSearch = debounce((event) => {
         const searchTerm = event.target.value.trim().toLowerCase();
-        console.log(`🔍 Mobile filter search: ${filterType} = "${searchTerm}"`);
-        
+
         // Get the checkbox container for this filter type
         const container = getContainerByType(filterType);
         if (!container) {
-          console.warn(`❌ No container found for filter type: ${filterType}`);
+
           return;
         }
         
@@ -4555,9 +4454,7 @@
             item.style.display = 'none';
           }
         });
-        
-        console.log(`👁️ Showing ${visibleCount}/${checkboxItems.length} items for "${searchTerm}"`);
-        
+
         // Show "no results" message if needed
         showNoResultsInModal(container, visibleCount === 0 && searchTerm);
         
@@ -4573,11 +4470,9 @@
           // The search is already happening in real-time, so just focus stays
         }
       });
-      
-      console.log(`✅ Mobile filter search set up for ${filterType}`);
+
     });
-    
-    console.log('🎉 Mobile filter search setup complete');
+
   }
   
   // Helper function to show/hide "no results" message in modal
@@ -4600,15 +4495,180 @@
       
       container.appendChild(noResultsDiv);
     }
+    }
+
+  // Set up modal management system
+  function setupModalManagement() {
+    // Setup each modal
+    const modals = document.querySelectorAll('.bal-category-modal');
+    console.log('🔧 Modal Management: Found', modals.length, 'modals with .bal-category-modal class');
+    modals.forEach((modal, index) => {
+      console.log(`🔧 Modal Management: Setting up modal ${index + 1}:`, modal);
+      initModal(modal);
+    });
+
+    function initModal(modal) {
+      // Delegate all clicks inside this modal
+      modal.addEventListener('click', function (e) {
+        // 1) MAIN CLOSE BUTTON (close the whole modal)
+        // Put your main close button inside the header with class .close-category
+        const mainClose = e.target.closest('.bal-category-modal-header .close-category');
+        if (mainClose) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeEntireModal(modal);
+          return;
+        }
+
+        // 2) OPEN SUB MODAL (match data-modal on trigger to data-id on slide)
+        const openTrigger = e.target.closest('.filter-tab-click');
+        if (openTrigger) {
+          e.preventDefault();
+          const id = (openTrigger.getAttribute('data-modal') || '').toLowerCase();
+          openSubModal(modal, id);
+          return;
+        }
+
+        // 3) SUB MODAL BACK (close only current sub modal)
+        const backBtn = e.target.closest('.filter-group-slide .back-to-main');
+        if (backBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const currentSlide = backBtn.closest('.filter-group-slide');
+          if (currentSlide) currentSlide.classList.remove('is-open');
+          return;
+        }
+
+        // 4) SUB MODAL CLOSE (close sub + main)
+        const subClose = e.target.closest('.filter-group-slide .close-category');
+        if (subClose) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeEntireModal(modal); // also clears any open sub
+          return;
+        }
+
+        // 4.5) CLEAR BUTTON (clear filters but DON'T close modal)
+        const clearBtn = e.target.closest('.btn-clear');
+        if (clearBtn && clearBtn.textContent.toLowerCase().includes('clear')) {
+          console.log('🧹 Modal Management: Clear button clicked!', clearBtn);
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Find which sub-modal this clear button is in
+          const currentSubModal = clearBtn.closest('[data-id]');
+          const modalId = currentSubModal?.getAttribute('data-id');
+          console.log('🧹 Modal Management: Found modalId:', modalId);
+          console.log('🧹 Modal Management: currentSubModal:', currentSubModal);
+          
+          // Debug: Let's see the parent structure
+          let parent = clearBtn.parentElement;
+          let level = 0;
+          while (parent && level < 10) {
+            console.log(`🔍 Parent level ${level}:`, parent.tagName, parent.className, parent.getAttribute('data-id'));
+            parent = parent.parentElement;
+            level++;
+          }
+          
+          // Clear filters but keep modal open
+          if (modalId) {
+            console.log('🧹 Modal Management: Clearing filters for modal:', modalId);
+            handleModalClearAllWithoutClosing(modalId);
+            console.log('🧹 Modal Management: Filters cleared, modal staying open');
+          } else {
+            console.log('🧹 Modal Management: No modalId found, trying fallback clear all');
+            // Fallback: Clear all filters if we can't determine the specific modal
+            handleModalClearAllWithoutClosing('all');
+          }
+          // DON'T close the modal - user should be able to continue selecting
+          return;
+        }
+
+        // 5) APPLY BUTTON (close sub + main after applying filters)
+        const applyBtn = e.target.closest('.filter-submit:not(.btn-clear)');
+        if (applyBtn && applyBtn.textContent.toLowerCase().includes('apply')) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Find which sub-modal this apply button is in
+          const currentSubModal = applyBtn.closest('[data-id]');
+          const modalId = currentSubModal?.getAttribute('data-id');
+          
+          // Apply filters first using the existing handler
+          if (modalId) {
+            handleModalApply(modalId);
+          } else {
+            // Fallback: just apply filters and close
+            applyMobileFilters();
+            closeEntireModal(modal);
+          }
+          return;
+        }
+
+        // (Optional) Overlay click to close main modal
+        if (e.target.classList && e.target.classList.contains('bal-modal-overlay')) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeEntireModal(modal);
+          return;
+        }
+      });
+
+      // ESC closes only if this modal is open
+      document.addEventListener('keydown', function onEsc(e) {
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) {
+          closeEntireModal(modal);
+        }
+      });
+    }
+
+    function openSubModal(mainModal, subModalId) {
+      // Close any currently open sub modals
+      const allSubModals = mainModal.querySelectorAll('.filter-group-slide');
+      allSubModals.forEach(sub => {
+        sub.classList.remove('is-open');
+        sub.classList.add('is-closed');
+      });
+      
+      // Open the requested sub modal
+      const targetSubModal = mainModal.querySelector(`[data-id="${subModalId}"]`);
+      if (targetSubModal) {
+        targetSubModal.classList.remove('is-closed');
+        targetSubModal.classList.add('is-open');
+        
+        // Remove any inline styles that might be hiding the modal
+        targetSubModal.style.display = '';
+        targetSubModal.style.visibility = '';
+        targetSubModal.style.opacity = '';
+      }
+    }
+
+    function closeEntireModal(mainModal) {
+      // Close all sub modals first
+      const allSubModals = mainModal.querySelectorAll('.filter-group-slide');
+      allSubModals.forEach(sub => {
+        sub.classList.remove('is-open');
+        sub.classList.add('is-closed');
+        // DON'T set permanent inline styles - let CSS handle visibility
+      });
+      
+      // Close main modal
+      mainModal.classList.remove('is-open');
+      mainModal.classList.add('is-closed');
+      // DON'T set permanent inline styles - let CSS handle visibility
+      
+      // Update mobile sorting display after closing
+      updateMobileSortingDisplay();
+    }
   }
-    
-    // Set up third party approval toggle and checkboxes
-    async function setupThirdPartyFilter() {
+
+  // Set up third party approval toggle and checkboxes
+  async function setupThirdPartyFilter() {
 ("Setting up third party approval filter...");
       
       // Check if the toggle exists
       if (!dom.thirdPartyToggle) {
-        // console.warn("Third party toggle not found");
+        // 
         return;
       }
       
@@ -4620,25 +4680,23 @@
         if (thirdParties.length > 0) {
           populateThirdPartyCheckboxes(thirdParties);
         } else {
-          // console.warn("No third parties found in the database");
+          // 
         }
       } catch (error) {
-        // console.error("Error setting up third party filter:", error);
+        // 
       }
       
       // Set up the main toggle
       dom.thirdPartyToggle.addEventListener('change', (event) => {
       const isToggleOn = event.target.checked;
       state.thirdPartyApproval = isToggleOn;
-      console.log(`🔄 Third party approval filter: ${isToggleOn ? 'ON' : 'OFF'}`);
-      
+
       // When toggle is ON, select all third-party checkboxes
       // When toggle is OFF, deselect all third-party checkboxes
       const thirdPartyModal = document.querySelector('[data-id="thirdparty"]');
       if (thirdPartyModal) {
         const checkboxItems = thirdPartyModal.querySelectorAll('.bal-dropdown-link.select-category');
-        console.log(`📋 Found ${checkboxItems.length} third-party checkboxes to ${isToggleOn ? 'activate' : 'deactivate'}`);
-        
+
         checkboxItems.forEach((checkboxItem, index) => {
           const input = checkboxItem.querySelector('input[type="checkbox"]');
           const customCheckbox = checkboxItem.querySelector('.w-checkbox-input');
@@ -4653,19 +4711,17 @@
             if (isToggleOn) {
               customCheckbox.classList.add('w--redirected-checked');
               state.selectedThirdParties.add(thirdPartyName);
-              console.log(`✅ Activated: ${thirdPartyName}`);
+
             } else {
               customCheckbox.classList.remove('w--redirected-checked');
               state.selectedThirdParties.delete(thirdPartyName);
-              console.log(`❌ Deactivated: ${thirdPartyName}`);
+
             }
           }
         });
-        
-        console.log(`📊 Total selected third parties: ${state.selectedThirdParties.size}`);
-        console.log(`📋 Selected third parties:`, Array.from(state.selectedThirdParties));
+
       } else {
-        console.warn("❌ Third-party modal not found");
+
       }
       
       // Update the tab display to show the new selection count
@@ -4689,15 +4745,13 @@
         // IMPORTANT: Only handle checkboxes that are in the third-party modal
         const thirdPartyModal = event.target.closest('[data-id="thirdparty"]');
         if (!thirdPartyModal) {
-          console.log(`🚫 Ignoring checkbox change - not in third-party modal`);
+
           return; // Skip if not in third-party modal
         }
         
           const thirdPartyName = event.target.nextElementSibling?.textContent?.trim();
           if (!thirdPartyName) return;
-          
-        console.log(`📋 Third-party checkbox changed: ${thirdPartyName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
-          
+
           if (event.target.checked) {
             // Add to selected third parties
             state.selectedThirdParties.add(thirdPartyName);
@@ -4705,9 +4759,7 @@
             // Remove from selected third parties
             state.selectedThirdParties.delete(thirdPartyName);
           }
-          
-        console.log("Selected third parties:", state.selectedThirdParties);
-          
+
           // Reset to first page and reload data
           state.currentPage = 1;
           cache.clear(); // Clear cache when changing filters
@@ -4773,8 +4825,7 @@
     // ─── FAWRI Activities Toggle Setup ─────────────────────────────
     
     function setupFawriToggle() {
-    
-      
+
       // Setup desktop toggle
       setupDesktopFawriToggle();
       
@@ -4788,17 +4839,14 @@
     function setupDesktopFawriToggle() {
       // Check if the desktop FAWRI toggle elements exist
       if (!dom.regularActivitiesTab || !dom.fawriActivitiesTab) {
-        console.warn("Desktop FAWRI toggle elements not found");
+
         return;
       }
-      
-    
-      
+
       // Set up Regular Activities tab click handler
       dom.regularActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-      
-        
+
         // Update state
         state.fawriMode = false;
         
@@ -4814,8 +4862,7 @@
       // Set up FAWRI Activities tab click handler
       dom.fawriActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-      
-        
+
         // Update state
         state.fawriMode = true;
         
@@ -4832,17 +4879,14 @@
     function setupMobileFawriToggle() {
       // Check if the mobile FAWRI toggle elements exist
       if (!dom.mobileRegularActivitiesTab || !dom.mobileFawriActivitiesTab) {
-        console.warn("Mobile FAWRI toggle elements not found");
+
         return;
       }
-      
-    
-      
+
       // Set up Mobile Regular Activities tab click handler
       dom.mobileRegularActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-      
-        
+
         // Update state
         state.fawriMode = false;
         
@@ -4858,8 +4902,7 @@
       // Set up Mobile FAWRI Activities tab click handler
       dom.mobileFawriActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-      
-        
+
         // Update state
         state.fawriMode = true;
         
@@ -4915,7 +4958,7 @@
         
         // Debug DOM elements
   ("DOM elements check:");
-  ("tableEl:", dom.tableEl);
+  ("tableEl:", dom.tableEl);    
   ("tableBodyEl:", dom.tableBodyEl);
   ("categoryContainers:", dom.categoryContainers);
   ("searchEl:", dom.searchEl);
@@ -4930,11 +4973,10 @@
   
         // Validate only essential DOM elements
         if (!dom.tableEl || !dom.tableBodyEl) {
-          // console.error('Required DOM elements not found. Please check HTML structure for missing elements.');
           
           // Detailed error messages for each missing element
-          if (!dom.tableEl) // console.error('Missing table element with class "table_component" or ID "bal-table"');
-          if (!dom.tableBodyEl) // console.error('Missing table body element with selector "table.table_component tbody.table_body" or "#bal-table .table_body"');
+          if (!dom.tableEl) // 
+          if (!dom.tableBodyEl) // 
           
           return;
         }
@@ -4976,11 +5018,11 @@
         setupThirdPartyFilter();
       
       // Set up approval stage filter
-      console.log("Setting up approval stage filter...");
+
       setupApprovalStageFilter();
       
       // Set up risk rating filter
-      console.log("Setting up risk rating filter...");
+
       setupRiskRatingFilter();
         
         // Set up FAWRI Activities toggle
@@ -5051,26 +5093,26 @@
         state.currentPage = 1;
         await renderPage(1);
         
-        // Set up modal footer buttons (after everything is loaded)
-      
-        setupModalFooterButtons();
+        // Set up modal footer buttons (disabled - using modal management system instead)
+        // setupModalFooterButtons();
         
-        // Also set up event delegation for modal buttons (fallback)
-      console.log('🔧 About to set up modal button delegation...');
-        setupModalButtonDelegation();
-      console.log('✅ Modal button delegation setup complete');
-      
+        // Also set up event delegation for modal buttons (disabled - using modal management system instead)
+        // setupModalButtonDelegation();
+
       // Set up mobile filter modal search inputs
       setupMobileFilterSearch();
-        
-        // Prevent form submissions in modal footers
-        preventModalFormSubmissions();
+      
+      // Set up modal management system
+      setupModalManagement();
+      
+      // Prevent form submissions in modal footers (disabled - using modal management system instead)
+      // preventModalFormSubmissions();
         
   ("Initialization complete");
         
       } catch (error) {
-        // console.error('Initialization error:', error);
-        // console.error(error.stack); // Show full stack trace
+          // 
+        // 
       }
     }
     
@@ -5217,8 +5259,6 @@
     updateMasterState();
   });
 })();
-
-
 
 //For - Table filter search
 document.addEventListener("DOMContentLoaded", function () {
@@ -5469,7 +5509,6 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-
 //For - copy activity item
 // Tooltip helper (z-index high so it appears above modals) - moved outside event handler for global access
   function showCopyTooltip(targetEl, text = "Copied!", duration = 3000) {
@@ -5565,7 +5604,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const data = JSON.parse(row.dataset.activityData);
         return data['Activity Name'] || '';
       } catch (e) {
-        // console.error('Error parsing activity data:', e);
       }
     }
     
@@ -5727,12 +5765,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }, 1000);
       
     }).catch(err => {
-      // console.error("Failed to copy text:", err);
+      // 
       showCopyTooltip(btn, "Copy failed", 3000);
     });
   });
 });
-
 
 // Toggle "is-saved" class on parent row
 document.addEventListener('click', function (e) {
@@ -5744,7 +5781,6 @@ document.addEventListener('click', function (e) {
     }
   }
 });
-
 
 //For - open BAL modal
 document.addEventListener("DOMContentLoaded", () => {
@@ -5835,8 +5871,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-
-
 //For - select list column 
 document.addEventListener("DOMContentLoaded", function () {
   // Collect all column-select widgets inside .bal-table
@@ -5892,8 +5926,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.key === "Escape") closeAll();
   });
 });
-
-
 
 //For - modal open saved item 
 document.addEventListener("DOMContentLoaded", function () {
@@ -6029,7 +6061,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.renderPage(1);
           }
         } else {
-          // console.error("Could not find search input in any location");
+          // 
         }
         
         return false;
@@ -6126,7 +6158,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   }, 1000);
                 })
                 .catch(err => {
-                  // console.error('Failed to copy text:', err);
+                  // 
                 });
             });
             
