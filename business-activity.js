@@ -39,6 +39,8 @@
       selectedGroups: new Set(),
       selectedCategories: new Set(),
       selectedCodes: new Set(),
+    selectedApprovalStages: new Set(), // Set of selected approval stages (PRE, POST, null)
+    selectedRiskRatings: new Set(), // Set of selected risk ratings (Low, Medium, High, Override)
       codeSortOrder: 'ascending', // 'ascending' or 'descending'
       fawriMode: false, // Toggle for FAWRI Activities (Low and Medium risk only)
     };
@@ -127,7 +129,7 @@
       // Mobile saved items container
       savedMobileContainer: document.querySelector('.bal-wrapper.for-mobile.saaved-items, .bal-wrapper.for-mobile.saved-items'),
       // Third party approval elements
-      thirdPartyToggle: document.querySelector('#select_all'),
+    thirdPartyToggle: document.querySelector('#select_all_item'),
       thirdPartyDropdown: document.querySelector('.third-party-approval'),
       thirdPartyCheckboxes: document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]'),
       unselectAllBtn: document.querySelector('.unselect-all'),
@@ -460,16 +462,16 @@
     // ─── Mobile Sorting/Filtering Logic ─────────────────────────────
 
     async function initMobileSorting() {
-      console.log("Initializing mobile sorting...");
+    
       
       if (!dom.mobileSortingTabs) {
-        console.log("Mobile sorting tabs not found");
+      
         return;
       }
       
       try {
-        // Fetch categories and groups from database
-        const { data, error } = await supabase.from('Activity List').select('Category, Group, Code');
+      // Fetch categories, groups, codes, and third parties from database
+      const { data, error } = await supabase.from('Activity List').select('Category, Group, Code, "Third Party"');
         if (error) {
           console.error("Error fetching data for mobile sorting:", error);
           return;
@@ -479,9 +481,11 @@
         const categories = Array.from(new Set(data.map(r => r.Category).filter(Boolean))).sort();
         const groups = Array.from(new Set(data.map(r => r.Group).filter(Boolean))).sort();
         const codes = Array.from(new Set(data.map(r => r.Code).filter(Boolean))).sort();
+      
         const thirdParties = Array.from(new Set(data.map(r => r['Third Party']).filter(Boolean))).sort();
+      console.log("✅ Extracted third parties:", thirdParties.length, thirdParties);
         
-        console.log(`Found ${categories.length} categories, ${groups.length} groups, ${codes.length} codes, ${thirdParties.length} third parties`);
+      
         
         // Find and populate existing modal containers
         findMobileModalContainers();
@@ -491,7 +495,7 @@
         setupMobileSortingTabs();
         
         // Set up footer buttons for all modals (with delay to ensure DOM is ready)
-        console.log("About to call setupModalFooterButtons...");
+      
         setTimeout(() => {
           setupModalFooterButtons();
         }, 500);
@@ -505,12 +509,11 @@
     }
     
     function findMobileModalContainers() {
-      console.log("Finding mobile modal containers...");
+    
       
       // Debug: log all elements with data-id attributes
       const allDataIdElements = document.querySelectorAll('[data-id]');
-      console.log(`Found ${allDataIdElements.length} elements with data-id:`, 
-        Array.from(allDataIdElements).map(el => el.getAttribute('data-id')));
+    
       
       // Look for modals with specific data-id attributes
       const groupModal = document.querySelector('[data-id="group"]');
@@ -519,56 +522,58 @@
       const thirdPartyModal = document.querySelector('[data-id="thirdparty"]');
       
       if (groupModal) {
-        console.log("Found group modal element:", groupModal);
+      
         const groupCheckboxContainer = groupModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
-        console.log("Group checkbox container:", groupCheckboxContainer);
+      
         if (groupCheckboxContainer) {
-          console.log("✅ Successfully found group modal with data-id='group'");
+        
           dom.mobileGroupCheckboxContainer = groupCheckboxContainer;
         }
       } else {
-        console.log("❌ No group modal found with data-id='group'");
+      
       }
       
       if (categoriesModal) {
-        console.log("Found categories modal element:", categoriesModal);
+      
         const categoriesCheckboxContainer = categoriesModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
-        console.log("Categories checkbox container:", categoriesCheckboxContainer);
+      
         if (categoriesCheckboxContainer) {
-          console.log("✅ Successfully found categories modal with data-id='categories' or 'category'");
+        
           dom.mobileCategoriesCheckboxContainer = categoriesCheckboxContainer;
         }
       } else {
-        console.log("❌ No categories modal found with data-id='categories' or 'category'");
+      
       }
       
       if (codeModal) {
-        console.log("Found code modal element:", codeModal);
+      
         const codeCheckboxContainer = codeModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
-        console.log("Code checkbox container:", codeCheckboxContainer);
+      
         if (codeCheckboxContainer) {
-          console.log("✅ Successfully found code modal with data-id='code'");
+        
           dom.mobileCodeCheckboxContainer = codeCheckboxContainer;
         }
       } else {
-        console.log("❌ No code modal found with data-id='code'");
+      
       }
       
       if (thirdPartyModal) {
-        console.log("Found third party modal element:", thirdPartyModal);
+      console.log("✅ Found third party modal:", thirdPartyModal);
         const thirdPartyCheckboxContainer = thirdPartyModal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
-        console.log("Third party checkbox container:", thirdPartyCheckboxContainer);
+      
         if (thirdPartyCheckboxContainer) {
-          console.log("✅ Successfully found third party modal with data-id='thirdparty'");
+        console.log("✅ Found third party checkbox container:", thirdPartyCheckboxContainer);
           dom.mobileThirdPartyCheckboxContainer = thirdPartyCheckboxContainer;
+      } else {
+        console.warn("❌ Third party checkbox container not found in modal");
         }
       } else {
-        console.log("❌ No third party modal found with data-id='thirdparty'");
+      console.warn("❌ Third party modal not found with [data-id='thirdparty']");
       }
       
       // Fallback: if data-id approach doesn't work, use the search input placeholder method
       if (!dom.mobileGroupCheckboxContainer || !dom.mobileCategoriesCheckboxContainer) {
-        console.log("Using fallback method to find modals...");
+      
         const filterModals = document.querySelectorAll('.filter-slide-wrap');
         
         filterModals.forEach((modal, index) => {
@@ -576,10 +581,10 @@
           const checkboxContainer = modal.querySelector('.bal-dropdown-checkbox-wrap.select-listing');
           
           if (searchInput && searchInput.placeholder.includes('group') && !dom.mobileGroupCheckboxContainer) {
-            console.log(`Found group modal at index ${index} using fallback`);
+          
             dom.mobileGroupCheckboxContainer = checkboxContainer;
           } else if (checkboxContainer && !dom.mobileCategoriesCheckboxContainer) {
-            console.log(`Found categories modal at index ${index} using fallback`);
+          
             dom.mobileCategoriesCheckboxContainer = checkboxContainer;
           }
         });
@@ -587,46 +592,59 @@
     }
     
     function populateExistingModals(categories, groups, codes, thirdParties) {
-      console.log("Populating existing modals with database data...");
+    console.log("📋 populateExistingModals called with:");
+    console.log("  - Categories:", categories?.length || 0);
+    console.log("  - Groups:", groups?.length || 0);  
+    console.log("  - Codes:", codes?.length || 0);
+    console.log("  - Third Parties:", thirdParties?.length || 0, thirdParties);
       
       // Populate groups modal
       if (dom.mobileGroupCheckboxContainer) {
-        populateCheckboxContainer(dom.mobileGroupCheckboxContainer, groups, 'group', 'Select All Groups');
+      populateCheckboxContainer(dom.mobileGroupCheckboxContainer, groups, 'group');
       }
       
       // Populate categories modal
       if (dom.mobileCategoriesCheckboxContainer) {
-        populateCheckboxContainer(dom.mobileCategoriesCheckboxContainer, categories, 'category', 'Select All Categories');
+      populateCheckboxContainer(dom.mobileCategoriesCheckboxContainer, categories, 'category');
       }
       
       // Populate codes modal
       if (dom.mobileCodeCheckboxContainer) {
-        populateCheckboxContainer(dom.mobileCodeCheckboxContainer, codes, 'code', 'Select all activities');
+      populateCheckboxContainer(dom.mobileCodeCheckboxContainer, codes, 'code');
       }
       
-      // Populate third party modal (keep existing items, just add click handlers)
+    // Populate third party modal with all data from database (like desktop version)
+    console.log("🎯 Checking third party container:", !!dom.mobileThirdPartyCheckboxContainer);
+    console.log("🎯 Third party container element:", dom.mobileThirdPartyCheckboxContainer);
       if (dom.mobileThirdPartyCheckboxContainer) {
-        setupThirdPartyCheckboxHandlers(dom.mobileThirdPartyCheckboxContainer);
-      }
-    }
-    
-    function populateCheckboxContainer(container, items, type, allText) {
-      console.log(`Populating ${type} container with ${items.length} items`);
+      console.log("✅ Third party container found, populating with database data...");
+      console.log("📊 Third parties from database:", thirdParties?.length || 0, thirdParties);
       
-      // Clear existing checkboxes except the first one (Select All)
+      if (thirdParties && thirdParties.length > 0) {
+        populateThirdPartyModal(dom.mobileThirdPartyCheckboxContainer, thirdParties);
+      } else {
+        console.warn("❌ No third party data available");
+      }
+    } else {
+      console.warn("❌ Third party container not found");
+    }
+  }
+  
+  function populateCheckboxContainer(container, items, type) {
+    console.log(`🔧 populateCheckboxContainer called for ${type}:`);
+    console.log(`  - Container:`, container);
+    console.log(`  - Items count:`, items?.length || 0);
+    console.log(`  - Items:`, items);
+    console.log(`  - Type:`, type);
+    
+    // Clear ALL existing checkboxes (no "Select All" needed)
       const existingItems = container.querySelectorAll('.bal-dropdown-link.select-category');
-      existingItems.forEach((item, index) => {
-        if (index === 0) {
-          // Update the "Select All" text and data attribute
-          const label = item.querySelector('.bal-checkbox-label');
-          const input = item.querySelector('input[type="checkbox"]');
-          if (label) label.textContent = allText;
-          if (input) input.dataset.name = allText;
-        } else {
-          // Remove other existing items
+    existingItems.forEach(item => {
           item.remove();
-        }
       });
+    console.log(`🧹 Removed ${existingItems.length} existing checkboxes (including Select All)`);
+    
+    // Note: We're not adding a "Select All" option anymore
       
       // Add new items from database
       items.forEach((item, index) => {
@@ -657,7 +675,22 @@
         checkboxLink.appendChild(checkboxField);
         
         // Add click event
-        checkboxLink.addEventListener('click', () => {
+      checkboxLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Toggle the checkbox state first
+        hiddenInput.checked = !hiddenInput.checked;
+        
+        // Update Webflow custom checkbox styling
+        const customCheckbox = checkboxLink.querySelector('.w-checkbox-input');
+        if (hiddenInput.checked) {
+          customCheckbox?.classList.add('w--redirected-checked');
+        } else {
+          customCheckbox?.classList.remove('w--redirected-checked');
+        }
+        
+        // Now call the handler with the updated state
           handleMobileCheckboxSelection(type, item, hiddenInput);
         });
         
@@ -670,50 +703,188 @@
         const selectAllInput = selectAllCheckbox.querySelector('input[type="checkbox"]');
         const selectAllText = selectAllCheckbox.querySelector('.bal-checkbox-label').textContent;
         
-        selectAllCheckbox.addEventListener('click', () => {
+      selectAllCheckbox.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Toggle the checkbox state first
+        selectAllInput.checked = !selectAllInput.checked;
+        
+        // Update Webflow custom checkbox styling
+        const customCheckbox = selectAllCheckbox.querySelector('.w-checkbox-input');
+        if (selectAllInput.checked) {
+          customCheckbox?.classList.add('w--redirected-checked');
+        } else {
+          customCheckbox?.classList.remove('w--redirected-checked');
+        }
+        
+        // Now call the handler with the updated state
           handleMobileCheckboxSelection(type, selectAllText, selectAllInput);
         });
       }
     }
     
-    function setupThirdPartyCheckboxHandlers(container) {
-      console.log("Setting up third party checkbox handlers...");
+  function setupThirdPartyEventHandlers(container) {
+    console.log("🔧 Setting up third party event handlers on existing content...");
+    console.log("📦 Container:", container);
       
-      // Add click handlers to existing third party checkboxes
+    // Find all existing checkbox links in the container
       const checkboxLinks = container.querySelectorAll('.bal-dropdown-link.select-category');
+    console.log(`📋 Found ${checkboxLinks.length} existing third party checkboxes`);
       
-      checkboxLinks.forEach(checkboxLink => {
+    checkboxLinks.forEach((checkboxLink, index) => {
         const input = checkboxLink.querySelector('input[type="checkbox"]');
         const label = checkboxLink.querySelector('.bal-checkbox-label');
         
         if (input && label) {
-          const thirdPartyName = label.textContent;
+        const thirdPartyName = label.textContent.trim();
+        
+        // Update the input's data-name attribute to match the actual name
           input.dataset.name = thirdPartyName;
           
+        console.log(`🔗 Setting up handler ${index + 1}: "${thirdPartyName}"`);
+        
+        // Remove any existing event listeners by cloning the element
+        const newCheckboxLink = checkboxLink.cloneNode(true);
+        checkboxLink.parentNode.replaceChild(newCheckboxLink, checkboxLink);
+        
+        // Get the new elements after cloning
+        const newInput = newCheckboxLink.querySelector('input[type="checkbox"]');
+        const newLabel = newCheckboxLink.querySelector('.bal-checkbox-label');
+        
+        // Add click event listener
+        newCheckboxLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Toggle the checkbox
+          newInput.checked = !newInput.checked;
+          
+          // Update Webflow custom checkbox styling
+          const customCheckbox = newCheckboxLink.querySelector('.w-checkbox-input');
+          if (customCheckbox) {
+            if (newInput.checked) {
+              customCheckbox.classList.add('w--redirected-checked');
+            } else {
+              customCheckbox.classList.remove('w--redirected-checked');
+            }
+          }
+          
+          console.log(`📝 Third party checkbox clicked: ${thirdPartyName} - ${newInput.checked ? 'checked' : 'unchecked'}`);
+          
+          // Call the mobile checkbox selection handler
+          handleMobileCheckboxSelection('thirdparty', thirdPartyName, newInput);
+        });
+        
+      } else {
+        console.warn(`⚠️ Missing input or label for checkbox ${index + 1}`);
+      }
+    });
+    
+    console.log("🎉 Third party event handlers setup complete");
+  }
+  
+  function populateThirdPartyModal(container, thirdParties) {
+    console.log("🏗️ Populating third party modal with database data...");
+    console.log(`📊 Received ${thirdParties.length} third parties:`, thirdParties);
+    
+    // Clear all existing checkboxes
+    const existingItems = container.querySelectorAll('.bal-dropdown-link.select-category');
+    console.log(`🧹 Clearing ${existingItems.length} existing items`);
+    existingItems.forEach(item => item.remove());
+    
+    // Filter out unwanted values: "N/A", null, undefined, empty strings, and whitespace-only strings
+    const validThirdParties = thirdParties.filter(thirdParty => {
+      if (!thirdParty) return false; // null, undefined, empty string
+      const trimmed = thirdParty.trim();
+      if (!trimmed) return false; // whitespace-only strings
+      if (trimmed.toLowerCase() === 'n/a') return false; // "N/A" values
+      return true;
+    });
+    
+    console.log(`📋 Filtered to ${validThirdParties.length} valid third parties (removed N/A and empty values)`);
+    
+    // Add only valid third parties from database (no "Select All" option - we have the toggle for that)
+    validThirdParties.forEach((thirdParty, index) => {
+      const checkboxItem = createThirdPartyCheckbox(thirdParty, index + 1, false);
+      container.appendChild(checkboxItem);
+      console.log(`✅ Added third party ${index + 1}: "${thirdParty}"`);
+    });
+    
+    console.log(`🎉 Third party modal populated with ${validThirdParties.length} valid items (no Select All - using toggle instead)`);
+  }
+  
+  function createThirdPartyCheckbox(thirdPartyName, index, isSelectAll) {
+    // Create the main container
+    const checkboxLink = document.createElement('div');
+    checkboxLink.className = 'bal-dropdown-link select-category';
+    
+    // Create the label
+    const label = document.createElement('label');
+    label.className = 'w-checkbox bal-checkbox-field check-list by-thirdparty';
+    
+    // Create the Webflow custom checkbox
+    const customCheckbox = document.createElement('div');
+    customCheckbox.className = 'w-checkbox-input w-checkbox-input--inputType-custom bal-checkbox';
+    
+    // Create the actual input
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = `Checkbox-ThirdParty-${index}`;
+    input.id = `Checkbox-ThirdParty-${index}`;
+    input.dataset.name = thirdPartyName;
+    input.style.opacity = '0';
+    input.style.position = 'absolute';
+    input.style.zIndex = '-1';
+    
+    // Create the label span
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'bal-checkbox-label w-form-label';
+    labelSpan.setAttribute('for', `Checkbox-ThirdParty-${index}`);
+    labelSpan.textContent = thirdPartyName;
+    
+    // Assemble the elements
+    label.appendChild(customCheckbox);
+    label.appendChild(input);
+    label.appendChild(labelSpan);
+    checkboxLink.appendChild(label);
+    
+    // Add click event listener
           checkboxLink.addEventListener('click', (e) => {
             e.preventDefault();
+      e.stopPropagation();
+      
+      // Toggle the checkbox
             input.checked = !input.checked;
+      
+      // Update Webflow custom checkbox styling
+      if (input.checked) {
+        customCheckbox.classList.add('w--redirected-checked');
+      } else {
+        customCheckbox.classList.remove('w--redirected-checked');
+      }
+      
+      console.log(`📝 Third party checkbox clicked: ${thirdPartyName} - ${input.checked ? 'checked' : 'unchecked'}`);
+      
+      // Call the mobile checkbox selection handler
             handleMobileCheckboxSelection('thirdparty', thirdPartyName, input);
           });
-        }
-      });
+    
+    return checkboxLink;
     }
     
     function setupModalFooterButtons() {
-      console.log("Setting up modal footer buttons...");
+    
       
       // Find all modals with data-id attributes
       const modals = document.querySelectorAll('[data-id]');
-      console.log(`Found ${modals.length} modals with data-id attributes:`, Array.from(modals).map(m => m.getAttribute('data-id')));
+    
       
       modals.forEach(modal => {
         const modalId = modal.getAttribute('data-id');
         const footer = modal.querySelector('.filter-footer');
         
-        console.log(`Modal ${modalId}:`, {
-          hasFooter: !!footer,
-          footer: footer
-        });
+      
         
         if (footer) {
           // Find ALL buttons in the footer, not just specific classes
@@ -721,32 +892,26 @@
           const clearButtons = footer.querySelectorAll('.btn-clear');
           const applyButtons = footer.querySelectorAll('.filter-submit:not(.btn-clear)');
           
-          console.log(`Modal ${modalId} buttons:`, {
-            totalButtons: allButtons.length,
-            allButtonTexts: Array.from(allButtons).map(b => b.textContent.trim()),
-            clearButtons: clearButtons.length,
-            applyButtons: applyButtons.length,
-            allButtons: Array.from(allButtons)
-          });
+        
           
           // Set up event listeners for all clear buttons
           clearButtons.forEach((clearButton, index) => {
-            console.log(`Setting up clear button ${index + 1} for modal: ${modalId}`);
+          
             clearButton.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log(`Clear button ${index + 1} clicked for modal: ${modalId}`);
+            
               handleModalClearAll(modalId);
             });
           });
           
           // Set up event listeners for all apply buttons
           applyButtons.forEach((applyButton, index) => {
-            console.log(`Setting up apply button ${index + 1} for modal: ${modalId}`);
+          
             applyButton.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log(`Apply button ${index + 1} clicked for modal: ${modalId}`);
+            
               handleModalApply(modalId);
             });
           });
@@ -758,25 +923,25 @@
             const isAlreadyApplyButton = Array.from(applyButtons).includes(button);
             
             if (buttonText.includes('clear') && !isAlreadyClearButton) {
-              console.log(`Setting up clear button by text "${buttonText}" for modal: ${modalId}`);
+            
               button.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log(`Clear button (by text) clicked for modal: ${modalId}`);
+              
                 handleModalClearAll(modalId);
               });
             } else if (buttonText.includes('apply') && !isAlreadyApplyButton) {
-              console.log(`Setting up apply button by text "${buttonText}" for modal: ${modalId}`);
+            
               button.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log(`Apply button (by text) clicked for modal: ${modalId}`);
+              
                 handleModalApply(modalId);
               });
             }
           });
           
-          console.log(`Set up footer buttons for modal: ${modalId}`);
+        
         }
         
         // Set up back button and close button
@@ -784,21 +949,21 @@
         const closeButton = modal.querySelector('.close-category');
         
         if (backButton) {
-          console.log(`Setting up back button for modal: ${modalId}`);
+        
           backButton.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log(`Back button clicked for modal: ${modalId}`);
+          
             closeFilterModal(modalId);
           });
         }
         
         if (closeButton) {
-          console.log(`Setting up close button for modal: ${modalId}`);
+        
           closeButton.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log(`Close button clicked for modal: ${modalId}`);
+          
             closeFilterModal(modalId);
           });
         }
@@ -806,37 +971,67 @@
     }
     
     function handleModalClearAll(modalId) {
-      console.log(`🧹 Clear all clicked for modal: ${modalId}`);
-      
-      // Clear selections based on modal type
-      switch (modalId) {
-        case 'group':
-          console.log(`Before clear - selectedGroups:`, Array.from(state.selectedGroups));
+    console.log(`🧹 CLEAR ALL FILTERS - triggered from modal: ${modalId}`);
+    console.log('📊 Current state before clearing:', {
+      selectedGroups: Array.from(state.selectedGroups),
+      selectedCategories: Array.from(state.selectedCategories),
+      selectedCodes: Array.from(state.selectedCodes),
+      selectedThirdParties: Array.from(state.selectedThirdParties),
+      selectedApprovalStages: Array.from(state.selectedApprovalStages),
+      selectedRiskRatings: Array.from(state.selectedRiskRatings),
+      fawriActivitiesOnly: state.fawriActivitiesOnly // Show FAWRI state but don't clear it
+    });
+    
+    // CLEAR ALL FILTERS (except FAWRI toggle)
+    console.log("🧹 Clearing ALL filter types...");
+    
+    // Clear all filter states
+    console.log("  ➖ Clearing groups");
           state.selectedGroups.clear();
-          console.log(`After clear - selectedGroups:`, Array.from(state.selectedGroups));
           updateMobileCheckboxStates('group');
-          break;
-        case 'categories':
-        case 'category':
-          console.log(`Before clear - selectedCategories:`, Array.from(state.selectedCategories));
+    
+    console.log("  ➖ Clearing categories");
           state.selectedCategories.clear();
-          console.log(`After clear - selectedCategories:`, Array.from(state.selectedCategories));
           updateMobileCheckboxStates('category');
-          break;
-        case 'code':
-          console.log(`Before clear - selectedCodes:`, Array.from(state.selectedCodes));
+    
+    console.log("  ➖ Clearing codes");
           state.selectedCodes.clear();
-          console.log(`After clear - selectedCodes:`, Array.from(state.selectedCodes));
           updateMobileCheckboxStates('code');
-          break;
-        case 'thirdparty':
-          console.log(`Before clear - selectedThirdParties:`, Array.from(state.selectedThirdParties));
+    
+    console.log("  ➖ Clearing third parties");
           state.selectedThirdParties.clear();
-          console.log(`After clear - selectedThirdParties:`, Array.from(state.selectedThirdParties));
           updateMobileCheckboxStates('thirdparty');
-          break;
-      }
-      
+    
+    // Reset third party toggle
+    if (dom.thirdPartyToggle) {
+      dom.thirdPartyToggle.checked = false;
+      state.thirdPartyApproval = false;
+    }
+    
+    console.log("  ➖ Clearing approval stages");
+    state.selectedApprovalStages.clear();
+    clearApprovalStageCheckboxes();
+    
+    console.log("  ➖ Clearing risk ratings");
+    state.selectedRiskRatings.clear();
+    clearRiskRatingCheckboxes();
+    
+    // Clear desktop category/group selections too
+    state.currentCategory = '';
+    state.currentGroup = '';
+    
+    console.log("✅ All filters cleared (FAWRI toggle preserved)");
+    console.log('📊 State after clearing:', {
+      selectedGroups: Array.from(state.selectedGroups),
+      selectedCategories: Array.from(state.selectedCategories),
+      selectedCodes: Array.from(state.selectedCodes),
+      selectedThirdParties: Array.from(state.selectedThirdParties),
+      selectedApprovalStages: Array.from(state.selectedApprovalStages),
+      selectedRiskRatings: Array.from(state.selectedRiskRatings),
+      fawriActivitiesOnly: state.fawriActivitiesOnly // Should remain unchanged
+    });
+    
+    console.log("✅ Filters cleared, updating display and applying filters");
       // Update display and apply filters
       updateMobileSortingDisplay();
       applyMobileFilters();
@@ -846,7 +1041,7 @@
     }
     
     function handleModalApply(modalId) {
-      console.log(`Apply clicked for modal: ${modalId}`);
+    
       
       // Apply filters
       applyMobileFilters();
@@ -856,13 +1051,13 @@
     }
     
     function closeFilterModal(modalId) {
-      console.log(`Closing filter modal: ${modalId}`);
+    
       
       // Find the modal element by data-id
       const modal = document.querySelector(`[data-id="${modalId}"]`);
       
       if (modal) {
-        console.log(`Found modal to close:`, modal);
+      
         
         // Try multiple approaches to close the modal
         
@@ -884,21 +1079,21 @@
         // 6. Try to find and click any close button
         const closeButton = modal.querySelector('.close-category, .modal-close, [aria-label="Close"]');
         if (closeButton) {
-          console.log(`Found close button, clicking it:`, closeButton);
+        
           closeButton.click();
         }
         
         // 7. Try to find and click any back button
         const backButton = modal.querySelector('.back-to-main');
         if (backButton) {
-          console.log(`Found back button, clicking it:`, backButton);
+        
           backButton.click();
         }
         
         // 8. Try to trigger a custom event that Webflow might be listening for
         modal.dispatchEvent(new CustomEvent('closeModal', { bubbles: true }));
         
-        console.log(`Applied multiple closing methods to modal: ${modalId}`);
+      
         
         // Optional: Add a small delay before showing the main filter interface
         setTimeout(() => {
@@ -906,7 +1101,7 @@
           modal.style.display = 'none';
           modal.style.visibility = 'hidden';
           modal.style.opacity = '0';
-          console.log(`Modal ${modalId} closed successfully`);
+        
         }, 100);
       } else {
         console.warn(`Modal with data-id="${modalId}" not found`);
@@ -914,22 +1109,113 @@
     }
     
     function setupModalButtonDelegation() {
-      console.log("Setting up modal button delegation...");
+    console.log('🚀 Setting up modal button delegation...');
       
-      // Use event delegation to catch button clicks anywhere in the document
+    // CRITICAL: Add this event listener with capture=true to catch events BEFORE other handlers
       document.addEventListener('click', (e) => {
+      // Check if clicked element is a clear button FIRST
+      if (e.target.matches('.btn-clear') || e.target.closest('.btn-clear')) {
+        console.log('🚨 PRIORITY: Clear button clicked! (captured early)');
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const button = e.target.matches('.btn-clear') ? e.target : e.target.closest('.btn-clear');
+        
+        // Debug: Show the DOM hierarchy to understand the structure
+        console.log('🔍 Clear button:', button);
+        console.log('🔍 Button parent elements:');
+        let parent = button.parentElement;
+        let level = 1;
+        while (parent && level <= 8) {
+          console.log(`  Level ${level}:`, parent.tagName, parent.className, parent.getAttribute('data-id'));
+          parent = parent.parentElement;
+          level++;
+        }
+        
+        // Try multiple ways to find the modal
+        let modal = button.closest('[data-id]');
+        let modalId = null;
+        
+        if (!modal) {
+          // Try finding modal by looking for common modal classes
+          modal = button.closest('.filter-slide-wrap, .filter-group-slide, .filter-categories-slide, .filter-code-slide');
+        }
+        if (!modal) {
+          // Try finding Webflow modal classes
+          modal = button.closest('.bal-category-modal, .bal-group-modal, .bal-code-modal, .bal-third-party-modal');
+        }
+        if (!modal) {
+          // Try finding any parent with filter-related or modal classes
+          modal = button.closest('[class*="filter-"], [class*="modal"], .bal-category, .bal-group, .bal-code');
+        }
+        
+        console.log('🔍 Modal found:', modal);
+        
+        if (modal) {
+          modalId = modal.getAttribute('data-id');
+          
+          // If no data-id, try to infer from class names
+          if (!modalId) {
+            const classList = Array.from(modal.classList);
+            console.log('🔍 Modal classes:', classList);
+            
+            // Try to determine modal type from classes - be more specific
+            if (classList.some(c => c.includes('group'))) {
+              modalId = 'group';
+            } else if (classList.some(c => c.includes('categor') || c.includes('category'))) {
+              modalId = 'categories';
+            } else if (classList.some(c => c.includes('code'))) {
+              modalId = 'code';
+            } else if (classList.some(c => c.includes('third'))) {
+              modalId = 'thirdparty';
+            }
+            
+            console.log('🔍 Inferred modal ID:', modalId);
+          }
+          
+          if (modalId) {
+            console.log('🔍 Final modal ID:', modalId);
+            handleModalClearAll(modalId);
+          } else {
+            console.warn('❌ Could not determine modal ID');
+          }
+        } else {
+          console.warn('❌ No modal found for clear button');
+        }
+        return false; // Stop all further processing
+      }
+    }, true); // USE CAPTURE PHASE to catch events before other handlers
+    
+    // SECONDARY: Test if ANY document clicks are being detected
+    document.addEventListener('click', (e) => {
+      // Only log if it's a button or link to reduce noise
+      if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('a, button')) {
+        console.log('🖱️ Button/Link click detected:', e.target);
+        console.log('🔍 Target tag:', e.target.tagName);
+        console.log('🔍 Target classes:', e.target.className);
+        console.log('🔍 Target text:', e.target.textContent?.trim());
+        console.log('🔍 Closest modal:', e.target.closest('[data-id]'));
+      }
+      
         // Check if clicked element is a clear button
         if (e.target.matches('.btn-clear') || e.target.closest('.btn-clear')) {
+        console.log('✅ Clear button clicked!');
           e.preventDefault();
           e.stopPropagation();
           
           const button = e.target.matches('.btn-clear') ? e.target : e.target.closest('.btn-clear');
           const modal = button.closest('[data-id]');
+        
+        console.log('🔍 Clear button:', button);
+        console.log('🔍 Modal found:', modal);
           
           if (modal) {
             const modalId = modal.getAttribute('data-id');
-            console.log(`Clear button clicked via delegation for modal: ${modalId}`);
+          console.log('🔍 Modal ID:', modalId);
+          
             handleModalClearAll(modalId);
+        } else {
+          console.warn('❌ No modal found for clear button');
           }
           return;
         }
@@ -944,7 +1230,7 @@
           
           if (modal) {
             const modalId = modal.getAttribute('data-id');
-            console.log(`Apply button clicked via delegation for modal: ${modalId}`);
+          
             handleModalApply(modalId);
           }
           return;
@@ -960,7 +1246,7 @@
           
           if (modal) {
             const modalId = modal.getAttribute('data-id');
-            console.log(`Back button clicked via delegation for modal: ${modalId}`);
+          
             closeFilterModal(modalId);
           }
           return;
@@ -976,42 +1262,42 @@
           
           if (modal) {
             const modalId = modal.getAttribute('data-id');
-            console.log(`Close button clicked via delegation for modal: ${modalId}`);
+          
             closeFilterModal(modalId);
           }
           return;
         }
       });
       
-      console.log("Modal button delegation set up successfully");
+    
     }
     
     function preventModalFormSubmissions() {
-      console.log("Setting up form submission prevention...");
+    
       
       // DIRECT APPROACH: Find all filter footers and attach listeners to their buttons
       const filterFooters = document.querySelectorAll('.filter-footer');
-      console.log(`Found ${filterFooters.length} filter footers`);
+    
       
       filterFooters.forEach((footer, index) => {
-        console.log(`Setting up filter footer ${index + 1}:`, footer);
+      
         
         // Find all buttons in this footer
         const allButtons = footer.querySelectorAll('a.w-button, a.filter-submit, button');
-        console.log(`Found ${allButtons.length} buttons in footer ${index + 1}`);
+      
         
         // Set up listeners for each button
         allButtons.forEach((button, btnIndex) => {
           const buttonText = button.textContent.trim();
           const buttonClasses = button.className;
-          console.log(`Button ${btnIndex + 1} in footer ${index + 1}: "${buttonText}" (${buttonClasses})`);
+        
           
           // Attach click listener
           button.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             
-            console.log(`Button clicked: "${buttonText}"`);
+          
             
             // Find the modal this button belongs to
             const modal = button.closest('[data-id]');
@@ -1020,18 +1306,18 @@
               
               // Handle based on button text
               if (buttonText.toLowerCase().includes('clear')) {
-                console.log(`🧹 Clear button clicked in modal ${modalId}`);
+              
                 
                 // DIRECT APPROACH: Clear all checkboxes in this modal
                 const checkboxItems = modal.querySelectorAll('.bal-dropdown-link.select-category');
-                console.log(`Found ${checkboxItems.length} checkboxes to clear`);
+              
                 
                 checkboxItems.forEach((item, idx) => {
                   const input = item.querySelector('input[type="checkbox"]');
                   const customCb = item.querySelector('.w-checkbox-input');
                   
                   if (input) {
-                    console.log(`Clearing checkbox ${idx}`);
+                  
                     input.checked = false;
                     if (customCb) {
                       customCb.classList.remove('w--redirected-checked');
@@ -1056,7 +1342,7 @@
                 closeFilterModal(modalId);
                 
               } else if (buttonText.toLowerCase().includes('apply')) {
-                console.log(`✅ Apply button clicked in modal ${modalId}`);
+              
                 
                 // Just close the modal - filters are already applied when checkboxes are clicked
                 closeFilterModal(modalId);
@@ -1070,13 +1356,13 @@
       
       // Also handle forms (as a backup)
       const modalForms = document.querySelectorAll('[data-id] form');
-      console.log(`Found ${modalForms.length} forms inside modals`);
+    
       
       modalForms.forEach((form, index) => {
-        console.log(`Setting up form ${index + 1}:`, form);
+      
         
         form.addEventListener('submit', (e) => {
-          console.log("Form submission prevented!");
+        
           e.preventDefault();
           e.stopPropagation();
           return false;
@@ -1092,7 +1378,7 @@
             e.preventDefault();
             e.stopPropagation();
             const modalId = modal.getAttribute('data-id');
-            console.log(`Back button clicked for modal: ${modalId}`);
+          
             closeFilterModal(modalId);
             return false;
           }
@@ -1104,7 +1390,7 @@
             e.preventDefault();
             e.stopPropagation();
             const modalId = modal.getAttribute('data-id');
-            console.log(`Close button clicked for modal: ${modalId}`);
+          
             closeFilterModal(modalId);
             return false;
           }
@@ -1114,7 +1400,7 @@
         if (button) {
           const modalForm = button.closest('[data-id] form');
           if (modalForm) {
-            console.log("Preventing button submission in modal form");
+          
             e.preventDefault();
             e.stopPropagation();
             
@@ -1125,20 +1411,16 @@
               const buttonText = button.textContent.trim();
               const buttonClasses = button.className;
               
-              console.log(`Button clicked in modal ${modalId}:`, {
-                text: buttonText,
-                classes: buttonClasses,
-                element: button
-              });
+            
               
               if (button.matches('.btn-clear') || buttonText.toLowerCase().includes('clear')) {
-                console.log(`✅ Clear button identified for modal: ${modalId}`);
+              
                 handleModalClearAll(modalId);
               } else if (button.matches('.filter-submit:not(.btn-clear)') || buttonText.toLowerCase().includes('apply')) {
-                console.log(`✅ Apply button identified for modal: ${modalId}`);
+              
                 handleModalApply(modalId);
               } else {
-                console.log(`⚠️ Unhandled button in modal ${modalId}:`, buttonText);
+              
               }
             }
             
@@ -1147,22 +1429,25 @@
         }
       });
       
-      console.log("Form submission prevention set up successfully");
+    
     }
     
     function setupMobileSortingTabs() {
-      console.log("Setting up mobile sorting tabs...");
+    
       
       // Update tab display text based on current state
       updateMobileSortingDisplay();
       
       // Set up modal click handlers - these will open the existing filter slide modals
       // The modals are already populated with database data and have click handlers
+    
+    // Set up filter tab click handlers for data-modal elements
+    setupFilterTabClickHandlers();
       
       // Set up tab switching
       if (dom.mobileGroupTab) {
         dom.mobileGroupTab.addEventListener('click', () => {
-          console.log("Mobile Group tab clicked");
+        
           // Reset other filters when switching tabs
           state.currentCategory = '';
           updateMobileSortingDisplay();
@@ -1171,7 +1456,7 @@
       
       if (dom.mobileCategoriesTab) {
         dom.mobileCategoriesTab.addEventListener('click', () => {
-          console.log("Mobile Categories tab clicked");
+        
           // Reset other filters when switching tabs
           state.currentGroup = '';
           updateMobileSortingDisplay();
@@ -1180,15 +1465,65 @@
       
       if (dom.mobileCodeTab) {
         dom.mobileCodeTab.addEventListener('click', () => {
-          console.log("Mobile Code tab clicked");
+        
           // This is for sorting, not filtering
           updateMobileSortingDisplay();
         });
       }
     }
+  
+  function setupFilterTabClickHandlers() {
+    // Set up click handlers for all filter tab elements with data-modal attributes
+    const filterTabs = document.querySelectorAll('[data-modal]');
+    
+    filterTabs.forEach(tab => {
+      const modalId = tab.getAttribute('data-modal');
+      
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log(`🔍 Filter tab clicked: ${modalId}`);
+        openFilterModal(modalId);
+      });
+    });
+  }
+  
+  function openFilterModal(modalId) {
+    console.log(`📂 Opening filter modal: ${modalId}`);
+    
+    // Find the modal element by data-id
+    const modal = document.querySelector(`[data-id="${modalId}"]`);
+    
+    if (modal) {
+      console.log(`✅ Found modal for ${modalId}:`, modal);
+      
+      // Remove is-closed class if present
+      modal.classList.remove('is-closed');
+      
+      // Add is-open class
+      modal.classList.add('is-open');
+      
+      // CRITICAL FIX: Clear any inline styles that might be hiding the modal
+      modal.style.display = '';
+      modal.style.visibility = '';
+      modal.style.opacity = '';
+        
+      // Also try to trigger any Webflow interactions
+      const overlay = modal.querySelector('.filter-slide-overlay');
+      if (overlay) {
+        overlay.style.display = '';
+        overlay.style.opacity = '';
+      }
+      
+      console.log(`🎉 Modal ${modalId} opened successfully`);
+    } else {
+      console.error(`❌ Could not find modal with data-id="${modalId}"`);
+    }
+  }
     
     function updateMobileSortingDisplay() {
-      console.log("Updating mobile sorting display...");
+    
       
       // Update Group tab using data-modal="group"
       const groupTab = document.querySelector('[data-modal="group"]');
@@ -1215,17 +1550,26 @@
         const categorySelect = categoriesTab.querySelector('.filter-tab-click-select');
         if (categorySelect) {
           const categoryCount = state.selectedCategories.size;
+        console.log(`📊 Categories tab update: count=${categoryCount}, items=`, Array.from(state.selectedCategories));
+        
           if (categoryCount > 0) {
             const selectedItems = Array.from(state.selectedCategories);
             if (categoryCount === 1) {
               categorySelect.textContent = selectedItems[0];
+            console.log(`✅ Categories tab set to single item: "${selectedItems[0]}"`);
             } else {
               categorySelect.textContent = `${categoryCount} Categories`;
+            console.log(`✅ Categories tab set to count: "${categoryCount} Categories"`);
             }
           } else {
             categorySelect.textContent = 'All Categories';
+          console.log(`✅ Categories tab set to default: "All Categories"`);
           }
+      } else {
+        console.warn('❌ Categories tab select element not found');
         }
+    } else {
+      console.warn('❌ Categories tab not found');
       }
       
       // Update Code tab using data-modal="code"
@@ -1270,7 +1614,27 @@
     }
     
     function handleMobileCheckboxSelection(type, item, checkbox) {
-      console.log(`Mobile checkbox selection: ${type} = ${item}`);
+    console.log(`🔍 Mobile checkbox selection: ${type} = ${item}`);
+    
+    // Debug: Check which container this checkbox belongs to
+    const container = checkbox.closest('.bal-dropdown-checkbox-wrap.select-listing');
+    const modal = checkbox.closest('[data-id]');
+    const modalId = modal?.getAttribute('data-id');
+    
+    console.log(`🏠 Container debug:`, {
+      modalId: modalId,
+      passedType: type,
+      itemName: item,
+      containerElement: container,
+      modalElement: modal
+    });
+    
+    // Additional debug: Check if the type matches the modal
+    if (modalId && modalId !== type) {
+      console.error(`🚨 TYPE MISMATCH: Passed type '${type}' but checkbox is in modal with data-id='${modalId}'`);
+      console.log(`🔧 Correcting type from '${type}' to '${modalId}'`);
+      type = modalId; // Fix the type based on the actual modal
+    }
       
       // Get the current state of the checkbox
       const isChecked = checkbox.checked;
@@ -1278,72 +1642,38 @@
       
       console.log(`Checkbox state: checked=${isChecked}, customCheckbox=${!!customCheckbox}`);
       
-      // Handle "Select All" logic
-      if (item === 'Select All Groups' || item === 'Select All Categories' || item === 'Select all activities') {
-        // Clear current selections
-        if (type === 'group') {
-          state.selectedGroups.clear();
-        } else if (type === 'category') {
-          state.selectedCategories.clear();
-        } else if (type === 'code') {
-          state.selectedCodes.clear();
-        } else if (type === 'thirdparty') {
-          state.selectedThirdParties.clear();
-        }
-        
-        // Uncheck all other checkboxes (both input and Webflow custom checkbox)
-        const container = getContainerByType(type);
-        const allCheckboxItems = container.querySelectorAll('.bal-dropdown-link.select-category');
-        
-        allCheckboxItems.forEach(checkboxItem => {
-          const input = checkboxItem.querySelector('input[type="checkbox"]');
-          const customCb = checkboxItem.querySelector('.w-checkbox-input');
-          
-          if (input && input !== checkbox) {
-            input.checked = false;
-            if (customCb) {
-              customCb.classList.remove('w--redirected-checked');
-            }
-          }
-        });
-        
-        // Check the "Select All" checkbox
-        checkbox.checked = true;
+    
+    // Note: "Select All" functionality removed - no longer needed
+    
+    // Handle individual item selection (multi-select)
+    const selectedSet = getSelectedSetByType(type);
+    
+    // IMPORTANT: Ensure visual and input states are synchronized
         if (customCheckbox) {
+      if (isChecked) {
           customCheckbox.classList.add('w--redirected-checked');
+      } else {
+        customCheckbox.classList.remove('w--redirected-checked');
         }
-        
-        // Update display and apply filters
-        updateMobileSortingDisplay();
-        applyMobileFilters();
-        return;
       }
-      
-      // Handle individual item selection (multi-select)
-      const selectedSet = getSelectedSetByType(type);
       
       if (isChecked) {
         // Add to selection
         selectedSet.add(item);
-        console.log(`Added ${item} to ${type} selection`);
-        
-        // Update Webflow custom checkbox
-        if (customCheckbox) {
-          customCheckbox.classList.add('w--redirected-checked');
-        }
+      console.log(`➕ Added "${item}" to ${type} selection`);
+      console.log(`📊 selectedSet after add:`, Array.from(selectedSet));
+      console.log(`📊 state.selectedCategories after add:`, Array.from(state.selectedCategories));
       } else {
         // Remove from selection
         selectedSet.delete(item);
-        console.log(`Removed ${item} from ${type} selection`);
-        
-        // Update Webflow custom checkbox
-        if (customCheckbox) {
-          customCheckbox.classList.remove('w--redirected-checked');
-        }
-      }
-      
-      // Uncheck "Select All" if individual items are selected
-      uncheckSelectAll(type);
+      console.log(`➖ Removed "${item}" from ${type} selection`);
+      console.log(`📊 selectedSet after remove:`, Array.from(selectedSet));
+      console.log(`📊 state.selectedCategories after remove:`, Array.from(state.selectedCategories));
+    }
+    
+    console.log(`📊 Current ${type} selection:`, Array.from(selectedSet));
+    
+    // Note: No "Select All" to uncheck anymore
       
       // Update display and apply filters
       updateMobileSortingDisplay(); // Update tab display
@@ -1357,6 +1687,7 @@
           container = dom.mobileGroupCheckboxContainer;
           break;
         case 'category': 
+      case 'categories': // Handle both singular and plural
           container = dom.mobileCategoriesCheckboxContainer;
           break;
         case 'code': 
@@ -1369,22 +1700,30 @@
           container = null;
       }
       
-      console.log(`getContainerByType(${type}):`, {
-        container: container,
-        hasContainer: !!container,
-        containerClasses: container?.className
-      });
+    
       
       return container;
     }
     
     function getSelectedSetByType(type) {
+    console.log(`🔍 getSelectedSetByType called with type: "${type}"`);
       switch (type) {
-        case 'group': return state.selectedGroups;
-        case 'category': return state.selectedCategories;
-        case 'code': return state.selectedCodes;
-        case 'thirdparty': return state.selectedThirdParties;
-        default: return new Set();
+      case 'group': 
+        console.log(`📊 Returning selectedGroups:`, Array.from(state.selectedGroups));
+        return state.selectedGroups;
+      case 'category':
+      case 'categories': // Handle both singular and plural
+        console.log(`📊 Returning selectedCategories:`, Array.from(state.selectedCategories));
+        return state.selectedCategories;
+      case 'code': 
+        console.log(`📊 Returning selectedCodes:`, Array.from(state.selectedCodes));
+        return state.selectedCodes;
+      case 'thirdparty': 
+        console.log(`📊 Returning selectedThirdParties:`, Array.from(state.selectedThirdParties));
+        return state.selectedThirdParties;
+      default: 
+        console.warn(`⚠️ Unknown type "${type}", returning empty Set`);
+        return new Set();
       }
     }
     
@@ -1399,11 +1738,7 @@
     }
     
     function applyMobileFilters() {
-      console.log('Applying mobile filters:', {
-        groups: Array.from(state.selectedGroups),
-        categories: Array.from(state.selectedCategories),
-        codes: Array.from(state.selectedCodes)
-      });
+    
       
       // Reset to first page and reload data
       state.currentPage = 1;
@@ -1411,10 +1746,10 @@
     }
     
     function updateMobileCheckboxStates(type) {
-      console.log(`📋 Updating checkbox states for type: ${type}`);
+    
       
       const container = getContainerByType(type);
-      console.log(`Container found:`, container);
+    
       
       if (!container) {
         console.warn(`❌ No container found for type: ${type}`);
@@ -1422,11 +1757,11 @@
       }
       
       const selectedSet = getSelectedSetByType(type);
-      console.log(`Selected set for ${type}:`, Array.from(selectedSet));
+    
       
       // Find all checkbox items (not just the input elements)
       const allCheckboxItems = container.querySelectorAll('.bal-dropdown-link.select-category');
-      console.log(`Found ${allCheckboxItems.length} checkbox items in container`);
+    
       
       // Clear all checkboxes (Webflow specific)
       allCheckboxItems.forEach((checkboxItem, index) => {
@@ -1435,12 +1770,7 @@
         const itemName = input?.dataset?.name;
         
         // Log what we found
-        console.log(`Checkbox item ${index}:`, {
-          item: checkboxItem,
-          input: input,
-          customCheckbox: customCheckbox,
-          itemName: itemName
-        });
+      
         
         if (!input || !customCheckbox) {
           console.warn(`⚠️ Missing input or custom checkbox for item ${index}`);
@@ -1453,13 +1783,8 @@
         let shouldBeChecked = false;
         
         // Determine if this checkbox should be checked
-        if (itemName === 'Select All Groups' || itemName === 'Select All Categories' || itemName === 'Select all activities') {
-          // Check "Select All" if no individual items are selected
-          shouldBeChecked = selectedSet.size === 0;
-        } else {
-          // Check individual item if it's in the selected set
+      // Check individual item if it's in the selected set (no "Select All" logic needed)
           shouldBeChecked = selectedSet.has(itemName);
-        }
         
         // Update the actual checkbox
         input.checked = shouldBeChecked;
@@ -1471,14 +1796,14 @@
           customCheckbox.classList.remove('w--redirected-checked');
         }
         
-        console.log(`Checkbox ${index} ${itemName ? `(${itemName})` : ''}: was: ${wasChecked}/${wasWebflowChecked}, now: ${shouldBeChecked}`);
+      
       });
       
-      console.log(`✅ Finished updating ${allCheckboxItems.length} checkboxes for ${type}`);
+    
     }
     
     function handleMobileSortingSelection(type, selectedItem) {
-      console.log(`Mobile sorting selection: ${type} = ${selectedItem}`);
+    
       
       switch (type) {
         case 'group':
@@ -1502,7 +1827,7 @@
     }
     
     function handleCodeSorting(sortOrder) {
-      console.log(`Code sorting: ${sortOrder}`);
+    
       // Store sort order in state
       state.codeSortOrder = sortOrder.toLowerCase();
       
@@ -1510,7 +1835,6 @@
       state.currentPage = 1;
       renderPage(1);
     }
-  
     // ─── Modal Logic ───────────────────────────────────────────────
     // Modal functionality is now handled by the new implementation
   
@@ -1881,7 +2205,7 @@
     function handleCategoryChange(newCategory) {
       if (state.currentCategory === newCategory) return;
       
-      console.log(`Changing category to: "${newCategory || 'All'}"`);
+    
       
       state.currentCategory = newCategory;
       state.currentGroup = ''; // Reset group when changing category
@@ -1897,7 +2221,7 @@
     function handleGroupChange(newGroup) {
       if (state.currentGroup === newGroup) return;
       
-      console.log(`Changing group to: "${newGroup || 'All'}"`);
+    
       
       state.currentGroup = newGroup;
       state.currentCategory = ''; // Reset category when changing group
@@ -1967,9 +2291,9 @@
       }
       
       state.currentPage = page;
-        const { currentCategory, currentGroup, searchTerm, columnFilters, thirdPartyApproval, selectedThirdParties, selectedGroups, selectedCategories, selectedCodes, fawriMode } = state;
+      const { currentCategory, currentGroup, searchTerm, columnFilters, thirdPartyApproval, selectedThirdParties, selectedGroups, selectedCategories, selectedCodes, selectedApprovalStages, selectedRiskRatings, fawriMode } = state;
 
-        const cacheKey = `${currentCategory}|${currentGroup}|${searchTerm}|${columnFilters}|${thirdPartyApproval}|${Array.from(selectedThirdParties).join(',')}|${Array.from(selectedGroups).join(',')}|${Array.from(selectedCategories).join(',')}|${Array.from(selectedCodes).join(',')}|${fawriMode}|${page}`;
+      const cacheKey = `${currentCategory}|${currentGroup}|${searchTerm}|${columnFilters}|${thirdPartyApproval}|${Array.from(selectedThirdParties).join(',')}|${Array.from(selectedGroups).join(',')}|${Array.from(selectedCategories).join(',')}|${Array.from(selectedCodes).join(',')}|${Array.from(selectedApprovalStages).join(',')}|${Array.from(selectedRiskRatings).join(',')}|${fawriMode}|${page}`;
 ("Cache key:", cacheKey);
       
       const cachedResult = cache.get(cacheKey);
@@ -2006,37 +2330,83 @@
       
       // Apply FAWRI mode filter (Low and Medium risk activities only)
       if (fawriMode) {
-        console.log('Applying FAWRI mode filter: Low and Medium risk activities only');
+      
         query = query.in('Risk Rating', ['Low', 'Medium']);
       }
       
       // Apply third party approval filter if enabled
       if (thirdPartyApproval) {
-  ("Applying third party approval filter");
+      console.log("🔍 Applying third party approval filter");
         query = query.not('Third Party', 'is', null);
       }
       
       // Apply specific third party filters if any are selected
       if (selectedThirdParties.size > 0) {
-        console.log(`Filtering by specific third parties: ${Array.from(selectedThirdParties).join(', ')}`);
+      console.log(`🎯 Filtering by specific third parties:`, Array.from(selectedThirdParties));
         query = query.in('Third Party', Array.from(selectedThirdParties));
       }
       
       // Apply mobile multi-select filters
       if (selectedGroups.size > 0) {
-        console.log(`Applying mobile group filters: ${Array.from(selectedGroups).join(', ')}`);
+      
         query = query.in('Group', Array.from(selectedGroups));
       }
       
       if (selectedCategories.size > 0) {
-        console.log(`Applying mobile category filters: ${Array.from(selectedCategories).join(', ')}`);
+      
         query = query.in('Category', Array.from(selectedCategories));
       }
       
       if (selectedCodes.size > 0) {
-        console.log(`Applying mobile code filters: ${Array.from(selectedCodes).join(', ')}`);
+      
         query = query.in('Code', Array.from(selectedCodes));
       }
+    
+    // Apply approval stage filters if any are selected
+    if (selectedApprovalStages.size > 0) {
+      console.log(`🔍 Filtering by approval stages:`, Array.from(selectedApprovalStages));
+      
+      // Convert UI values to API values and handle null case
+      const apiValues = Array.from(selectedApprovalStages).map(stage => {
+        switch (stage) {
+          case 'Pre-approval': return 'PRE';
+          case 'Post-approval': return 'POST';
+          case 'N/A': return null;
+          default: return stage;
+        }
+      });
+      
+      // Handle null values separately since Supabase needs special handling for null
+      const nonNullValues = apiValues.filter(val => val !== null);
+      const hasNullValue = apiValues.includes(null);
+      
+      if (nonNullValues.length > 0 && hasNullValue) {
+        // Include both non-null values and null values
+        query = query.or(`When.in.(${nonNullValues.join(',')}),When.is.null`);
+      } else if (nonNullValues.length > 0) {
+        // Only non-null values
+        query = query.in('When', nonNullValues);
+      } else if (hasNullValue) {
+        // Only null values
+        query = query.is('When', null);
+      }
+    }
+    
+    // Apply risk rating filters if any are selected
+    if (selectedRiskRatings.size > 0) {
+      console.log(`🎯 Filtering by risk ratings:`, Array.from(selectedRiskRatings));
+      
+      // Convert UI values to API values
+      const apiValues = Array.from(selectedRiskRatings).map(rating => {
+        switch (rating) {
+          case 'High-override': return 'Override';
+          default: return rating; // Low, Medium, High stay the same
+        }
+      });
+      
+      console.log(`🔄 Converted risk ratings to API values:`, apiValues);
+      query = query.in('Risk Rating', apiValues);
+    }
       
       // Apply column-specific filters
       if (columnFilters) {
@@ -2288,20 +2658,20 @@
       // Only clear the container if not appending
       if (!append) {
         if (isMobile) {
-          console.log("Clearing mobile list container");
+        
           dom.mobileListEl.innerHTML = '';
         } else {
-          console.log("Clearing table body");
+        
       dom.tableBodyEl.innerHTML = '';
         }
       } else {
-        console.log("Appending to existing content");
+      
       }
   
       if (data?.length > 0) {
-        console.log(`Creating ${data.length} ${isMobile ? 'mobile items' : 'table rows'}`);
+      
         data.forEach((item, index) => {
-          console.log(`Creating ${isMobile ? 'mobile item' : 'row'} ${index + 1}/${data.length}`);
+        
           
           if (isMobile) {
             // Render mobile version
@@ -2457,7 +2827,7 @@
           }
         });
       } else {
-        console.log("No data to display, showing 'no results' message");
+      
         if (isMobile) {
           // Mobile no results message
           const noResultsDiv = document.createElement('div');
@@ -2479,7 +2849,7 @@
         
         try {
         dom.tableBodyEl.appendChild(noResultsRow);
-            console.log("No results message added to table");
+          
         } catch (err) {
             console.error("Error appending no results message:", err);
           }
@@ -2618,17 +2988,17 @@
     // ─── Search Functionality ──────────────────────────────────────
   
     function setupSearch() {
-      console.log("Setting up search functionality...");
+    
       
       // Set up all search inputs (desktop and mobile)
       if (dom.searchInputs && dom.searchInputs.length > 0) {
-        console.log(`Found ${dom.searchInputs.length} search inputs, setting up search-on-type for all`);
+      
         
         // Set up search-on-type with debounce for all search inputs
         const handleSearchInput = debounce((event) => {
           const searchTerm = event.target.value.trim();
           
-          console.log(`Search term from ${event.target.id || event.target.className}: "${searchTerm}"`);
+        
           state.searchTerm = searchTerm;
           state.currentPage = 1;
           renderPage(1);
@@ -2643,7 +3013,7 @@
         
         // Attach event listeners to all search inputs
         dom.searchInputs.forEach((searchInput, index) => {
-          console.log(`Setting up search input ${index + 1}:`, searchInput.id || searchInput.className);
+        
           
           // Attach search-on-type event listener
           searchInput.addEventListener('input', handleSearchInput);
@@ -2655,7 +3025,7 @@
               
               // Trigger search manually on Enter
               const searchTerm = searchInput.value.trim();
-              console.log(`Search term from Enter key: ${searchTerm}`);
+            
               
             state.searchTerm = searchTerm;
             state.currentPage = 1;
@@ -2674,22 +3044,22 @@
       
       // Set up main search form to prevent submission
       if (dom.searchForm) {
-        console.log("Search form found, setting up to prevent submission");
+      
         
         // Prevent form submission - use capture phase to ensure it's caught early
         dom.searchForm.addEventListener('submit', (event) => {
-          console.log("Form submit event detected - preventing default");
+        
           event.preventDefault();
           event.stopPropagation();
           
           // Find the search input directly within the form
           const searchInput = event.target.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-          console.log("Search input found within form:", !!searchInput);
+        
           
           // Trigger search manually
           if (searchInput) {
             const searchTerm = searchInput.value.trim();
-            console.log(`Search term from form submit: ${searchTerm}`);
+          
             
             state.searchTerm = searchTerm;
             state.currentPage = 1;
@@ -2708,14 +3078,14 @@
         
         // Also prevent default on the form itself using the onsubmit property
         dom.searchForm.onsubmit = function() {
-          console.log("Form onsubmit triggered - preventing default");
+        
           return false;
         };
       }
         
       // Set up search submit buttons
         if (dom.searchSubmitBtn) {
-        console.log("Search submit button found");
+      
           
           // Remove any existing click listeners
           const newSubmitBtn = dom.searchSubmitBtn.cloneNode(true);
@@ -2726,7 +3096,7 @@
           
           // Add new click listener
           dom.searchSubmitBtn.addEventListener('click', (event) => {
-          console.log("Search button clicked - preventing default");
+        
             event.preventDefault();
             event.stopPropagation();
             
@@ -2737,7 +3107,7 @@
               const searchContainer = event.target.closest('.bal-search');
               if (searchContainer) {
             searchInput = searchContainer.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-            console.log("Search input found in container from button:", !!searchInput);
+          
           }
           
           // Strategy 2: Look for input in the same form
@@ -2745,20 +3115,20 @@
             const form = event.target.closest('form');
             if (form) {
               searchInput = form.querySelector('input[type="text"], input.bal-search-input, #search-input, input[name="searchInput"]');
-              console.log("Search input found in form from button:", !!searchInput);
+            
             }
           }
           
           // Strategy 3: Use the first search input from our collection
           if (!searchInput && dom.searchInputs.length > 0) {
             searchInput = dom.searchInputs[0];
-            console.log("Using first search input from collection");
+          
           }
           
           // Trigger search if we found an input
             if (searchInput) {
               const searchTerm = searchInput.value.trim();
-            console.log(`Search triggered from button: "${searchTerm}"`);
+          
               state.searchTerm = searchTerm;
               state.currentPage = 1;
               renderPage(1);
@@ -2770,7 +3140,7 @@
               }
             });
           } else {
-            console.log("No search input found from button click");
+          
             }
             
             return false; // Extra measure to prevent submission
@@ -3553,33 +3923,33 @@
     
     // Render saved items in both mobile and desktop views
     function renderSavedItems() {
-      console.log("Rendering saved items...");
+    
       
       // Re-query the DOM in case it wasn't available during initialization
       if (!dom.savedTableBody) {
-        console.log("Saved table body not found in DOM object, trying to re-query...");
+      
         dom.savedTableBody = document.querySelector('.bal-table-saved-tbody, #saved_list_table tbody, .bal-table-saved tbody');
-        console.log("Re-query result:", !!dom.savedTableBody);
+      
       }
       
       // Also re-query mobile container
       if (!dom.savedMobileContainer) {
-        console.log("Saved mobile container not found, trying to re-query...");
+      
         dom.savedMobileContainer = document.querySelector('.bal-wrapper.for-mobile.saaved-items, .bal-wrapper.for-mobile.saved-items');
-        console.log("Mobile container re-query result:", !!dom.savedMobileContainer);
+      
       }
       
       const savedActivities = getSavedActivities();
-      console.log(`Found ${savedActivities.length} saved activities to render`);
+    
       
       // Clear both desktop table and mobile container
       if (dom.savedTableBody) {
-        console.log("Clearing saved table body...");
+      
       dom.savedTableBody.innerHTML = '';
       }
       
       if (dom.savedMobileContainer) {
-        console.log("Clearing saved mobile container...");
+      
         dom.savedMobileContainer.innerHTML = '';
       }
       
@@ -3896,6 +4266,341 @@
       // Update DOM reference to include new checkboxes
       dom.thirdPartyCheckboxes = document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
     }
+  
+  // Set up approval stage filter checkboxes
+  function setupApprovalStageFilter() {
+    console.log("🎯 Setting up approval stage filter...");
+    
+    // Find the approval stage checkboxes container
+    const approvalStageContainer = document.querySelector('.filter-when .bal-dropdown-checkbox-wrap');
+    
+    if (!approvalStageContainer) {
+      console.warn("❌ Approval stage container not found");
+      return;
+    }
+    
+    console.log("✅ Found approval stage container:", approvalStageContainer);
+    
+    // Find all checkboxes in the approval stage container
+    const checkboxes = approvalStageContainer.querySelectorAll('input[type="checkbox"]');
+    
+    console.log(`📋 Found ${checkboxes.length} approval stage checkboxes`);
+    
+    // Set up event listeners for each checkbox
+    checkboxes.forEach((checkbox, index) => {
+      const label = checkbox.nextElementSibling;
+      const stageName = label ? label.textContent.trim() : `Stage ${index + 1}`;
+      
+      console.log(`🔗 Setting up listener for: "${stageName}"`);
+      
+      checkbox.addEventListener('change', (event) => {
+        console.log(`📝 Approval stage checkbox changed: ${stageName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
+        
+        if (event.target.checked) {
+          // Add to selected approval stages
+          state.selectedApprovalStages.add(stageName);
+          console.log(`➕ Added "${stageName}" to approval stages`);
+        } else {
+          // Remove from selected approval stages
+          state.selectedApprovalStages.delete(stageName);
+          console.log(`➖ Removed "${stageName}" from approval stages`);
+        }
+        
+        console.log("📊 Current selected approval stages:", Array.from(state.selectedApprovalStages));
+        
+        // Reset to first page and reload data
+        state.currentPage = 1;
+        cache.clear(); // Clear cache when changing filters
+        renderPage(1);
+      });
+    });
+    
+    console.log("🎉 Approval stage filter setup complete");
+  }
+
+  function clearApprovalStageCheckboxes() {
+    console.log("🧹 Clearing approval stage checkboxes...");
+    const approvalStageContainer = document.querySelector('.filter-when .bal-dropdown-checkbox-wrap');
+    if (!approvalStageContainer) return;
+
+    const checkboxItems = approvalStageContainer.querySelectorAll('.bal-dropdown-link.select-category');
+    checkboxItems.forEach((item) => {
+      const input = item.querySelector('input[type="checkbox"]');
+      const customCheckbox = item.querySelector('.w-checkbox-input');
+      
+      if (input && customCheckbox) {
+        input.checked = false;
+        customCheckbox.classList.remove('w--redirected-checked');
+      }
+    });
+    console.log("✅ Approval stage checkboxes cleared");
+  }
+
+  // Set up risk rating filter checkboxes
+  function setupRiskRatingFilter() {
+    console.log("🎯 Setting up risk rating filter...");
+    
+    // Find the risk rating checkboxes container
+    const riskRatingContainer = document.querySelector('.filter-risk .bal-dropdown-checkbox-wrap');
+    
+    if (!riskRatingContainer) {
+      console.warn("❌ Risk rating container not found");
+      return;
+    }
+    
+    console.log("✅ Found risk rating container:", riskRatingContainer);
+    
+    // Find all checkboxes in the risk rating container
+    const checkboxes = riskRatingContainer.querySelectorAll('input[type="checkbox"]');
+    
+    console.log(`📋 Found ${checkboxes.length} risk rating checkboxes`);
+    
+    // Set up event listeners for each checkbox
+    checkboxes.forEach((checkbox, index) => {
+      const label = checkbox.nextElementSibling;
+      const ratingName = label ? label.textContent.trim() : `Rating ${index + 1}`;
+      
+      console.log(`🔗 Setting up listener for: "${ratingName}"`);
+      
+      checkbox.addEventListener('change', (event) => {
+        console.log(`📝 Risk rating checkbox changed: ${ratingName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
+        
+        if (event.target.checked) {
+          // Add to selected risk ratings
+          state.selectedRiskRatings.add(ratingName);
+          console.log(`➕ Added "${ratingName}" to risk ratings`);
+        } else {
+          // Remove from selected risk ratings
+          state.selectedRiskRatings.delete(ratingName);
+          console.log(`➖ Removed "${ratingName}" from risk ratings`);
+        }
+        
+        console.log("📊 Current selected risk ratings:", Array.from(state.selectedRiskRatings));
+        
+        // Reset to first page and reload data
+        state.currentPage = 1;
+        cache.clear(); // Clear cache when changing filters
+        renderPage(1);
+      });
+    });
+    
+    console.log("🎉 Risk rating filter setup complete");
+  }
+
+  function clearRiskRatingCheckboxes() {
+    console.log("🧹 Clearing risk rating checkboxes...");
+    const riskRatingContainer = document.querySelector('.filter-risk .bal-dropdown-checkbox-wrap');
+    if (!riskRatingContainer) return;
+
+    const checkboxItems = riskRatingContainer.querySelectorAll('.bal-dropdown-link.select-category');
+    checkboxItems.forEach((item) => {
+      const input = item.querySelector('input[type="checkbox"]');
+      const customCheckbox = item.querySelector('.w-checkbox-input');
+      
+      if (input && customCheckbox) {
+        input.checked = false;
+        customCheckbox.classList.remove('w--redirected-checked');
+      }
+    });
+    console.log("✅ Risk rating checkboxes cleared");
+  }
+
+  // Set up mobile filter modal search inputs to work like th-search
+  function setupMobileFilterSearch() {
+    console.log('🔍 Setting up mobile filter search inputs...');
+    
+    // First, find all mobile filter modal containers
+    const mobileFilterModals = document.querySelectorAll('.filter-modal-mob');
+    console.log(`📋 Found ${mobileFilterModals.length} mobile filter modal containers`);
+    
+    // Check each container for search inputs, create if missing
+    mobileFilterModals.forEach((modalContainer, index) => {
+      const balSearchContainer = modalContainer.querySelector('.bal-search');
+      if (!balSearchContainer) {
+        console.log(`⚠️ Modal ${index + 1}: No .bal-search container found`);
+        return;
+      }
+      
+      let searchInput = balSearchContainer.querySelector('input[type="text"]');
+      
+      if (!searchInput) {
+        console.log(`🔧 Modal ${index + 1}: Creating missing search input`);
+        
+        // Create the missing input element
+        searchInput = document.createElement('input');
+        searchInput.className = 'bal-search-input search-group w-input';
+        searchInput.type = 'text';
+        searchInput.maxLength = 256;
+        searchInput.name = 'searchInput';
+        searchInput.setAttribute('data-name', 'searchInput');
+        searchInput.id = `search-input-${index}`;
+        
+        // Determine appropriate placeholder based on modal type
+        const modal = modalContainer.closest('[data-id]');
+        const modalId = modal?.getAttribute('data-id');
+        
+        if (modalId === 'group') {
+          searchInput.placeholder = 'Search by group number';
+        } else if (modalId === 'categories' || modalId === 'category') {
+          searchInput.placeholder = 'Search categories';
+        } else if (modalId === 'code') {
+          searchInput.placeholder = 'Search activities';
+        } else if (modalId === 'thirdparty') {
+          searchInput.placeholder = 'Search third parties';
+        } else {
+          searchInput.placeholder = 'Search...';
+        }
+        
+        // Insert the input after the search icon
+        const searchIcon = balSearchContainer.querySelector('.bal-search-icon');
+        if (searchIcon) {
+          searchIcon.insertAdjacentElement('afterend', searchInput);
+        } else {
+          balSearchContainer.appendChild(searchInput);
+        }
+        
+        console.log(`✅ Modal ${index + 1}: Created search input for ${modalId} with placeholder: "${searchInput.placeholder}"`);
+      } else {
+        console.log(`✅ Modal ${index + 1}: Found existing search input with placeholder: "${searchInput.placeholder}"`);
+      }
+    });
+    
+    // Now find all mobile filter search inputs (including newly created ones)
+    const mobileSearchInputs = document.querySelectorAll('.filter-modal-mob input[type="text"], .bal-search-input');
+    console.log(`📋 Total mobile filter search inputs: ${mobileSearchInputs.length}`);
+    
+    mobileSearchInputs.forEach((searchInput, index) => {
+      // Try multiple ways to find the modal container
+      let modal = searchInput.closest('[data-id]');
+      let modalId = modal?.getAttribute('data-id');
+      
+      // If not found, try looking for the modal container that contains this search input
+      if (!modal) {
+        const filterModalContainer = searchInput.closest('.filter-modal-mob');
+        if (filterModalContainer) {
+          // Look for the modal in the parent elements
+          modal = filterModalContainer.closest('[data-id]') || 
+                  filterModalContainer.parentElement?.closest('[data-id]') ||
+                  document.querySelector('[data-id].is-open');
+          modalId = modal?.getAttribute('data-id');
+        }
+      }
+      
+      console.log(`🔗 Setting up search input ${index + 1}:`, {
+        placeholder: searchInput.placeholder,
+        modalId: modalId,
+        modal: modal,
+        filterModalContainer: searchInput.closest('.filter-modal-mob'),
+        input: searchInput
+      });
+      
+      // Determine what type of filter this is based on modal ID first (more reliable)
+      let filterType = 'unknown';
+      const placeholder = searchInput.placeholder.toLowerCase();
+      
+      console.log(`🔍 Detection debug:`, {
+        modalId: modalId,
+        placeholder: placeholder,
+        inputClasses: searchInput.className
+      });
+      
+      // Prioritize modal ID over placeholder (more reliable)
+      if (modalId === 'group') {
+        filterType = 'group';
+      } else if (modalId === 'categories' || modalId === 'category') {
+        filterType = 'category';
+      } else if (modalId === 'code') {
+        filterType = 'code';
+      } else if (modalId === 'thirdparty') {
+        filterType = 'thirdparty';
+      } else {
+        // Fallback to placeholder detection if no modal ID
+        if (placeholder.includes('group')) {
+          filterType = 'group';
+        } else if (placeholder.includes('categor')) {
+          filterType = 'category';
+        } else if (placeholder.includes('code') || placeholder.includes('activit')) {
+          filterType = 'code';
+        } else if (placeholder.includes('third')) {
+          filterType = 'thirdparty';
+        }
+      }
+      
+      console.log(`📊 Detected filter type: ${filterType} (based on modalId: ${modalId})`);
+      
+      // Set up real-time search with debouncing (like th-search)
+      const handleFilterSearch = debounce((event) => {
+        const searchTerm = event.target.value.trim().toLowerCase();
+        console.log(`🔍 Mobile filter search: ${filterType} = "${searchTerm}"`);
+        
+        // Get the checkbox container for this filter type
+        const container = getContainerByType(filterType);
+        if (!container) {
+          console.warn(`❌ No container found for filter type: ${filterType}`);
+          return;
+        }
+        
+        // Filter the checkboxes based on search term
+        const checkboxItems = container.querySelectorAll('.bal-dropdown-link.select-category');
+        let visibleCount = 0;
+        
+        checkboxItems.forEach(item => {
+          const label = item.querySelector('.bal-checkbox-label');
+          const itemText = label ? label.textContent.trim().toLowerCase() : '';
+          
+          if (!searchTerm || itemText.includes(searchTerm)) {
+            item.style.display = '';
+            visibleCount++;
+          } else {
+            item.style.display = 'none';
+          }
+        });
+        
+        console.log(`👁️ Showing ${visibleCount}/${checkboxItems.length} items for "${searchTerm}"`);
+        
+        // Show "no results" message if needed
+        showNoResultsInModal(container, visibleCount === 0 && searchTerm);
+        
+      }, 300); // 300ms debounce like th-search
+      
+      // Attach the search handler
+      searchInput.addEventListener('input', handleFilterSearch);
+      
+      // Handle Enter key
+      searchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          // The search is already happening in real-time, so just focus stays
+        }
+      });
+      
+      console.log(`✅ Mobile filter search set up for ${filterType}`);
+    });
+    
+    console.log('🎉 Mobile filter search setup complete');
+  }
+  
+  // Helper function to show/hide "no results" message in modal
+  function showNoResultsInModal(container, show) {
+    // Remove existing "no results" message
+    const existingNoResults = container.querySelector('.mobile-filter-no-results');
+    if (existingNoResults) {
+      existingNoResults.remove();
+    }
+    
+    if (show) {
+      // Create and add "no results" message
+      const noResultsDiv = document.createElement('div');
+      noResultsDiv.className = 'mobile-filter-no-results';
+      noResultsDiv.style.padding = '20px';
+      noResultsDiv.style.textAlign = 'center';
+      noResultsDiv.style.color = '#666';
+      noResultsDiv.style.fontStyle = 'italic';
+      noResultsDiv.textContent = 'No matching items found';
+      
+      container.appendChild(noResultsDiv);
+    }
+  }
     
     // Set up third party approval toggle and checkboxes
     async function setupThirdPartyFilter() {
@@ -3923,8 +4628,48 @@
       
       // Set up the main toggle
       dom.thirdPartyToggle.addEventListener('change', (event) => {
-        state.thirdPartyApproval = event.target.checked;
-  (`Third party approval filter: ${state.thirdPartyApproval ? 'ON' : 'OFF'}`);
+      const isToggleOn = event.target.checked;
+      state.thirdPartyApproval = isToggleOn;
+      console.log(`🔄 Third party approval filter: ${isToggleOn ? 'ON' : 'OFF'}`);
+      
+      // When toggle is ON, select all third-party checkboxes
+      // When toggle is OFF, deselect all third-party checkboxes
+      const thirdPartyModal = document.querySelector('[data-id="thirdparty"]');
+      if (thirdPartyModal) {
+        const checkboxItems = thirdPartyModal.querySelectorAll('.bal-dropdown-link.select-category');
+        console.log(`📋 Found ${checkboxItems.length} third-party checkboxes to ${isToggleOn ? 'activate' : 'deactivate'}`);
+        
+        checkboxItems.forEach((checkboxItem, index) => {
+          const input = checkboxItem.querySelector('input[type="checkbox"]');
+          const customCheckbox = checkboxItem.querySelector('.w-checkbox-input');
+          const label = checkboxItem.querySelector('.bal-checkbox-label');
+          const thirdPartyName = label?.textContent?.trim();
+          
+          if (input && customCheckbox && thirdPartyName) {
+            // Update checkbox state
+            input.checked = isToggleOn;
+            
+            // Update visual state
+            if (isToggleOn) {
+              customCheckbox.classList.add('w--redirected-checked');
+              state.selectedThirdParties.add(thirdPartyName);
+              console.log(`✅ Activated: ${thirdPartyName}`);
+            } else {
+              customCheckbox.classList.remove('w--redirected-checked');
+              state.selectedThirdParties.delete(thirdPartyName);
+              console.log(`❌ Deactivated: ${thirdPartyName}`);
+            }
+          }
+        });
+        
+        console.log(`📊 Total selected third parties: ${state.selectedThirdParties.size}`);
+        console.log(`📋 Selected third parties:`, Array.from(state.selectedThirdParties));
+      } else {
+        console.warn("❌ Third-party modal not found");
+      }
+      
+      // Update the tab display to show the new selection count
+      updateMobileSortingDisplay();
         
         // Reset to first page and reload data
         state.currentPage = 1;
@@ -3934,16 +4679,24 @@
       
       // Set up event delegation for checkbox changes - use document level delegation
       // to catch events regardless of where the checkboxes are in the DOM
+    // BUT ONLY for third-party modal checkboxes
       document.addEventListener('change', (event) => {
         // Check if the changed element is a checkbox in our dropdown
         if (event.target.type === 'checkbox' && 
             (event.target.closest('.bal-dropdown-checkbox-wrap') || 
              event.target.closest('.bal-select-items-wrap'))) {
           
+        // IMPORTANT: Only handle checkboxes that are in the third-party modal
+        const thirdPartyModal = event.target.closest('[data-id="thirdparty"]');
+        if (!thirdPartyModal) {
+          console.log(`🚫 Ignoring checkbox change - not in third-party modal`);
+          return; // Skip if not in third-party modal
+        }
+        
           const thirdPartyName = event.target.nextElementSibling?.textContent?.trim();
           if (!thirdPartyName) return;
           
-    (`Checkbox changed: ${thirdPartyName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
+        console.log(`📋 Third-party checkbox changed: ${thirdPartyName} - ${event.target.checked ? 'checked' : 'unchecked'}`);
           
           if (event.target.checked) {
             // Add to selected third parties
@@ -3953,7 +4706,7 @@
             state.selectedThirdParties.delete(thirdPartyName);
           }
           
-    ("Selected third parties:", state.selectedThirdParties);
+        console.log("Selected third parties:", state.selectedThirdParties);
           
           // Reset to first page and reload data
           state.currentPage = 1;
@@ -3992,7 +4745,9 @@
           event.preventDefault();
           
           // Reset third party approval toggle
+        if (dom.thirdPartyToggle) {
           dom.thirdPartyToggle.checked = false;
+        }
           state.thirdPartyApproval = false;
           
           // Get current checkboxes (they might have been dynamically created)
@@ -4018,7 +4773,7 @@
     // ─── FAWRI Activities Toggle Setup ─────────────────────────────
     
     function setupFawriToggle() {
-      console.log("Setting up FAWRI Activities toggle...");
+    
       
       // Setup desktop toggle
       setupDesktopFawriToggle();
@@ -4037,12 +4792,12 @@
         return;
       }
       
-      console.log("Desktop FAWRI toggle elements found");
+    
       
       // Set up Regular Activities tab click handler
       dom.regularActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-        console.log("Desktop Regular Activities tab clicked");
+      
         
         // Update state
         state.fawriMode = false;
@@ -4059,7 +4814,7 @@
       // Set up FAWRI Activities tab click handler
       dom.fawriActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-        console.log("Desktop FAWRI Activities tab clicked");
+      
         
         // Update state
         state.fawriMode = true;
@@ -4081,12 +4836,12 @@
         return;
       }
       
-      console.log("Mobile FAWRI toggle elements found");
+    
       
       // Set up Mobile Regular Activities tab click handler
       dom.mobileRegularActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-        console.log("Mobile Regular Activities tab clicked");
+      
         
         // Update state
         state.fawriMode = false;
@@ -4103,7 +4858,7 @@
       // Set up Mobile FAWRI Activities tab click handler
       dom.mobileFawriActivitiesTab.addEventListener('click', (event) => {
         event.preventDefault();
-        console.log("Mobile FAWRI Activities tab clicked");
+      
         
         // Update state
         state.fawriMode = true;
@@ -4128,10 +4883,10 @@
         // Add active class to the appropriate desktop tab
         if (state.fawriMode) {
           dom.fawriActivitiesTab.classList.add('is-active');
-          console.log("Desktop FAWRI Activities tab activated");
+        
         } else {
           dom.regularActivitiesTab.classList.add('is-active');
-          console.log("Desktop Regular Activities tab activated");
+        
         }
       }
       
@@ -4144,10 +4899,10 @@
         // Add active class to the appropriate mobile tab
         if (state.fawriMode) {
           dom.mobileFawriActivitiesTab.classList.add('is-active');
-          console.log("Mobile FAWRI Activities tab activated");
+        
         } else {
           dom.mobileRegularActivitiesTab.classList.add('is-active');
-          console.log("Mobile Regular Activities tab activated");
+        
         }
       }
     }
@@ -4197,11 +4952,11 @@
         }
         
         // Set up category and group filters
-        console.log("Initializing category and group filters...");
+      
         await initCategoryRadios();
         
         // Set up mobile sorting
-        console.log("Initializing mobile sorting...");
+      
         await initMobileSorting();
         
         // Always default to 'All Categories' on page load
@@ -4219,9 +4974,17 @@
         // Set up third party approval filter
   ("Setting up third party approval filter...");
         setupThirdPartyFilter();
+      
+      // Set up approval stage filter
+      console.log("Setting up approval stage filter...");
+      setupApprovalStageFilter();
+      
+      // Set up risk rating filter
+      console.log("Setting up risk rating filter...");
+      setupRiskRatingFilter();
         
         // Set up FAWRI Activities toggle
-        console.log("Setting up FAWRI Activities toggle...");
+      
         setupFawriToggle();
         
         // Load saved items
@@ -4289,11 +5052,16 @@
         await renderPage(1);
         
         // Set up modal footer buttons (after everything is loaded)
-        console.log("Setting up modal footer buttons after initialization...");
+      
         setupModalFooterButtons();
         
         // Also set up event delegation for modal buttons (fallback)
+      console.log('🔧 About to set up modal button delegation...');
         setupModalButtonDelegation();
+      console.log('✅ Modal button delegation setup complete');
+      
+      // Set up mobile filter modal search inputs
+      setupMobileFilterSearch();
         
         // Prevent form submissions in modal footers
         preventModalFormSubmissions();
