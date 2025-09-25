@@ -982,8 +982,6 @@
     
     // Version of handleModalClearAll that doesn't close the modal (for use with modal management system)
     function handleModalClearAllWithoutClosing(modalId) {
-      console.log('🧹 handleModalClearAllWithoutClosing called with modalId:', modalId);
-      
       // CLEAR ALL FILTERS (except FAWRI toggle)
       
       // Clear all filter states
@@ -1016,10 +1014,8 @@
       state.currentGroup = '';
       
       // Update display and apply filters
-      console.log('🧹 Updating display and applying filters...');
       updateMobileSortingDisplay();
       applyMobileFilters();
-      console.log('🧹 Clear operation completed!');
     }
     
     function handleModalApply(modalId) {
@@ -4501,11 +4497,7 @@
   function setupModalManagement() {
     // Setup each modal
     const modals = document.querySelectorAll('.bal-category-modal');
-    console.log('🔧 Modal Management: Found', modals.length, 'modals with .bal-category-modal class');
-    modals.forEach((modal, index) => {
-      console.log(`🔧 Modal Management: Setting up modal ${index + 1}:`, modal);
-      initModal(modal);
-    });
+    modals.forEach(initModal);
 
     function initModal(modal) {
       // Delegate all clicks inside this modal
@@ -4551,32 +4543,17 @@
         // 4.5) CLEAR BUTTON (clear filters but DON'T close modal)
         const clearBtn = e.target.closest('.btn-clear');
         if (clearBtn && clearBtn.textContent.toLowerCase().includes('clear')) {
-          console.log('🧹 Modal Management: Clear button clicked!', clearBtn);
           e.preventDefault();
           e.stopPropagation();
           
           // Find which sub-modal this clear button is in
           const currentSubModal = clearBtn.closest('[data-id]');
           const modalId = currentSubModal?.getAttribute('data-id');
-          console.log('🧹 Modal Management: Found modalId:', modalId);
-          console.log('🧹 Modal Management: currentSubModal:', currentSubModal);
-          
-          // Debug: Let's see the parent structure
-          let parent = clearBtn.parentElement;
-          let level = 0;
-          while (parent && level < 10) {
-            console.log(`🔍 Parent level ${level}:`, parent.tagName, parent.className, parent.getAttribute('data-id'));
-            parent = parent.parentElement;
-            level++;
-          }
           
           // Clear filters but keep modal open
           if (modalId) {
-            console.log('🧹 Modal Management: Clearing filters for modal:', modalId);
             handleModalClearAllWithoutClosing(modalId);
-            console.log('🧹 Modal Management: Filters cleared, modal staying open');
           } else {
-            console.log('🧹 Modal Management: No modalId found, trying fallback clear all');
             // Fallback: Clear all filters if we can't determine the specific modal
             handleModalClearAllWithoutClosing('all');
           }
