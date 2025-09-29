@@ -139,7 +139,7 @@
         // ─── Utility Functions ─────────────────────────────────────────
 
     function isMobileView() {
-      return window.innerWidth <= 992; // Consider mobile for screens 992px and below
+      return window.innerWidth <= 991; // Mobile view starts at 991px and below
     }
 
     function createMobileItem(item) {
@@ -179,19 +179,31 @@
       const baLabels = document.createElement('div');
       baLabels.className = 'ba-labels';
       
-      // Add DNFBP label if exists
-      if (item.DNFBP) {
+      // Add DNFBP label if exists and not null/N/A
+      if (item.DNFBP && item.DNFBP !== 'N/A' && item.DNFBP.trim() !== '') {
         const dnfbpLabel = document.createElement('div');
         dnfbpLabel.className = 'ba-label';
         dnfbpLabel.textContent = 'DNFBP';
         baLabels.appendChild(dnfbpLabel);
       }
       
-      // Add third party approval label if exists
-      if (item['Third Party'] && item['Third Party'] !== 'N/A') {
+      // Add approval stage label based on actual data
+      if (item['When']) {
         const approvalLabel = document.createElement('div');
         approvalLabel.className = 'ba-label';
-        approvalLabel.textContent = 'pre approval';
+        
+        // Convert database values to display text
+        switch (item['When']) {
+          case 'PRE':
+            approvalLabel.textContent = 'Pre Approval';
+            break;
+          case 'POST':
+            approvalLabel.textContent = 'Post Approval';
+            break;
+          default:
+            // If it's not PRE or POST, show the actual value
+            approvalLabel.textContent = item['When'];
+        }
         baLabels.appendChild(approvalLabel);
       }
       
@@ -299,19 +311,31 @@
       const baLabels = document.createElement('div');
       baLabels.className = 'ba-labels';
       
-      // Add DNFBP label if exists
-      if (item.DNFBP) {
+      // Add DNFBP label if exists and not null/N/A
+      if (item.DNFBP && item.DNFBP !== 'N/A' && item.DNFBP.trim() !== '') {
         const dnfbpLabel = document.createElement('div');
         dnfbpLabel.className = 'ba-label';
         dnfbpLabel.textContent = 'DNFBP';
         baLabels.appendChild(dnfbpLabel);
       }
       
-      // Add third party approval label if exists
-      if (item['Third Party'] && item['Third Party'] !== 'N/A') {
+      // Add approval stage label based on actual data
+      if (item['When']) {
         const approvalLabel = document.createElement('div');
         approvalLabel.className = 'ba-label';
-        approvalLabel.textContent = 'pre approval';
+        
+        // Convert database values to display text
+        switch (item['When']) {
+          case 'PRE':
+            approvalLabel.textContent = 'Pre Approval';
+            break;
+          case 'POST':
+            approvalLabel.textContent = 'Post Approval';
+            break;
+          default:
+            // If it's not PRE or POST, show the actual value
+            approvalLabel.textContent = item['When'];
+        }
         baLabels.appendChild(approvalLabel);
       }
       
@@ -616,12 +640,11 @@
   }
   
   function populateCheckboxContainer(container, items, type) {
-
-    // Clear ALL existing checkboxes (no "Select All" needed)
-      const existingItems = container.querySelectorAll('.bal-dropdown-link.select-category');
+    // Clear ALL existing checkboxes (including any pre-existing "Select All")
+    const existingItems = container.querySelectorAll('.bal-dropdown-link');
     existingItems.forEach(item => {
-          item.remove();
-      });
+      item.remove();
+    });
 
     // Note: We're not adding a "Select All" option anymore
       
@@ -629,6 +652,8 @@
       items.forEach((item, index) => {
         const checkboxLink = document.createElement('div');
         checkboxLink.className = 'bal-dropdown-link select-category';
+        checkboxLink.setAttribute('data-item-index', index);
+        checkboxLink.setAttribute('data-item-name', item);
         
         const checkboxField = document.createElement('label');
         checkboxField.className = 'w-checkbox bal-checkbox-field check-list';
@@ -639,8 +664,10 @@
         const hiddenInput = document.createElement('input');
         hiddenInput.type = 'checkbox';
         hiddenInput.name = `${type}-${index}`;
-        hiddenInput.id = `${type}-${index}`;
+        hiddenInput.id = `${type}-${index}-${Date.now()}`; // Ensure unique IDs
         hiddenInput.dataset.name = item;
+        hiddenInput.dataset.type = type;
+        hiddenInput.dataset.index = index;
         hiddenInput.style.cssText = 'opacity:0;position:absolute;z-index:-1';
         
         const label = document.createElement('span');
@@ -676,31 +703,12 @@
         container.appendChild(checkboxLink);
       });
       
-      // Set up the "Select All" checkbox click handler
-      const selectAllCheckbox = container.querySelector('.bal-dropdown-link.select-category');
-      if (selectAllCheckbox) {
-        const selectAllInput = selectAllCheckbox.querySelector('input[type="checkbox"]');
-        const selectAllText = selectAllCheckbox.querySelector('.bal-checkbox-label').textContent;
-        
-      selectAllCheckbox.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Toggle the checkbox state first
-        selectAllInput.checked = !selectAllInput.checked;
-        
-        // Update Webflow custom checkbox styling
-        const customCheckbox = selectAllCheckbox.querySelector('.w-checkbox-input');
-        if (selectAllInput.checked) {
-          customCheckbox?.classList.add('w--redirected-checked');
-        } else {
-          customCheckbox?.classList.remove('w--redirected-checked');
-        }
-        
-        // Now call the handler with the updated state
-          handleMobileCheckboxSelection(type, selectAllText, selectAllInput);
-        });
-      }
+      // Update checkbox states after all items are created
+      setTimeout(() => {
+        updateMobileCheckboxStates(type);
+      }, 50);
+      
+      // Note: No "Select All" functionality - each item is individually selectable
     }
     
   function setupThirdPartyEventHandlers(container) {
@@ -1019,20 +1027,26 @@
     }
     
     function handleModalApply(modalId) {
-      // Apply filters
-      applyMobileFilters();
-      
-      // Find the main modal container
-      const subModal = document.querySelector(`[data-id="${modalId}"]`);
-      const mainModal = subModal ? subModal.closest('.bal-category-modal') : null;
-      
-      if (mainModal) {
-        // Use the new modal management system to close both sub and main modals
-        closeEntireModalFromId(mainModal);
+      // Apply filters with mobile optimization
+      if (isMobileView()) {
+        debouncedApplyMobileFilters();
       } else {
-        // Fallback to old method if main modal not found
-        closeFilterModal(modalId);
+        applyMobileFilters();
       }
+      
+      // Optimized modal closing for better performance
+      requestAnimationFrame(() => {
+        const subModal = document.querySelector(`[data-id="${modalId}"]`);
+        const mainModal = subModal ? subModal.closest('.bal-category-modal') : null;
+        
+        if (mainModal) {
+          // Use the new modal management system to close both sub and main modals
+          closeEntireModalFromId(mainModal);
+        } else {
+          // Fallback to old method if main modal not found
+          closeFilterModal(modalId);
+        }
+      });
     }
     
     // Helper function to close entire modal (accessible from outside setupModalManagement)
@@ -1513,141 +1527,179 @@
     }
   }
     
+    // Cache DOM elements for better performance
+    let cachedMobileElements = null;
+    let lastMobileState = null;
+
+    function initializeMobileDisplayCache() {
+      if (!cachedMobileElements) {
+        cachedMobileElements = {
+          groupTab: document.querySelector('[data-modal="group"]'),
+          categoriesTab: document.querySelector('[data-modal="categories"]'),
+          codeTab: document.querySelector('[data-modal="code"]'),
+          thirdPartyTab: document.querySelector('[data-modal="thirdparty"]')
+        };
+        
+        // Cache the select elements too
+        if (cachedMobileElements.groupTab) {
+          cachedMobileElements.groupSelect = cachedMobileElements.groupTab.querySelector('.filter-tab-click-select');
+        }
+        if (cachedMobileElements.categoriesTab) {
+          cachedMobileElements.categorySelect = cachedMobileElements.categoriesTab.querySelector('.filter-tab-click-select');
+        }
+        if (cachedMobileElements.codeTab) {
+          cachedMobileElements.codeSelect = cachedMobileElements.codeTab.querySelector('.filter-tab-click-select');
+        }
+        if (cachedMobileElements.thirdPartyTab) {
+          cachedMobileElements.thirdPartySelect = cachedMobileElements.thirdPartyTab.querySelector('.filter-tab-click-select');
+        }
+      }
+    }
+
     function updateMobileSortingDisplay() {
+      // Skip updates if not in mobile view to improve desktop performance
+      if (!isMobileView()) return;
 
-      // Update Group tab using data-modal="group"
-      const groupTab = document.querySelector('[data-modal="group"]');
-      if (groupTab) {
-        const groupSelect = groupTab.querySelector('.filter-tab-click-select');
-        if (groupSelect) {
-          const groupCount = state.selectedGroups.size;
-          if (groupCount > 0) {
-            const selectedItems = Array.from(state.selectedGroups);
-            if (groupCount === 1) {
-              groupSelect.textContent = selectedItems[0];
-            } else {
-              groupSelect.textContent = `${groupCount} Groups`;
-            }
-          } else {
-            groupSelect.textContent = 'All Groups';
-          }
+      initializeMobileDisplayCache();
+
+      // Create current state snapshot for comparison
+      const currentState = {
+        groupCount: state.selectedGroups.size,
+        categoryCount: state.selectedCategories.size,
+        codeCount: state.selectedCodes.size,
+        thirdPartyCount: state.selectedThirdParties.size
+      };
+
+      // Skip update if state hasn't changed
+      if (lastMobileState && 
+          currentState.groupCount === lastMobileState.groupCount &&
+          currentState.categoryCount === lastMobileState.categoryCount &&
+          currentState.codeCount === lastMobileState.codeCount &&
+          currentState.thirdPartyCount === lastMobileState.thirdPartyCount) {
+        return;
+      }
+
+      // Update Group tab
+      if (cachedMobileElements.groupSelect) {
+        const groupCount = currentState.groupCount;
+        if (groupCount > 0) {
+          const selectedItems = Array.from(state.selectedGroups);
+          cachedMobileElements.groupSelect.textContent = groupCount === 1 ? 
+            selectedItems[0] : `${groupCount} Groups`;
+        } else {
+          cachedMobileElements.groupSelect.textContent = 'All Groups';
         }
       }
       
-      // Update Categories tab using data-modal="categories"
-      const categoriesTab = document.querySelector('[data-modal="categories"]');
-      if (categoriesTab) {
-        const categorySelect = categoriesTab.querySelector('.filter-tab-click-select');
-        if (categorySelect) {
-          const categoryCount = state.selectedCategories.size;
-
-          if (categoryCount > 0) {
-            const selectedItems = Array.from(state.selectedCategories);
-            if (categoryCount === 1) {
-              categorySelect.textContent = selectedItems[0];
-
-            } else {
-              categorySelect.textContent = `${categoryCount} Categories`;
-
-            }
-          } else {
-            categorySelect.textContent = 'All Categories';
-
-          }
-      } else {
-
-        }
-    } else {
-
-      }
-      
-      // Update Code tab using data-modal="code"
-      const codeTab = document.querySelector('[data-modal="code"]');
-      if (codeTab) {
-        const codeSelect = codeTab.querySelector('.filter-tab-click-select');
-        if (codeSelect) {
-          const codeCount = state.selectedCodes.size;
-          if (codeCount > 0) {
-            const selectedItems = Array.from(state.selectedCodes);
-            if (codeCount === 1) {
-              codeSelect.textContent = selectedItems[0];
-            } else {
-              codeSelect.textContent = `${codeCount} Codes`;
-            }
-          } else {
-            codeSelect.textContent = 'All Activities';
-          }
+      // Update Categories tab
+      if (cachedMobileElements.categorySelect) {
+        const categoryCount = currentState.categoryCount;
+        if (categoryCount > 0) {
+          const selectedItems = Array.from(state.selectedCategories);
+          cachedMobileElements.categorySelect.textContent = categoryCount === 1 ? 
+            selectedItems[0] : `${categoryCount} Categories`;
+        } else {
+          cachedMobileElements.categorySelect.textContent = 'All Categories';
         }
       }
       
-      // Update Third Party tab using data-modal="thirdparty"
-      const thirdPartyTab = document.querySelector('[data-modal="thirdparty"]');
-      if (thirdPartyTab) {
-        const thirdPartySelect = thirdPartyTab.querySelector('.filter-tab-click-select');
-        if (thirdPartySelect) {
-          const thirdPartyCount = state.selectedThirdParties.size;
-          if (thirdPartyCount > 0) {
-            const selectedItems = Array.from(state.selectedThirdParties);
-            if (thirdPartyCount === 1) {
-              // Show abbreviated version for long names
-              const item = selectedItems[0];
-              thirdPartySelect.textContent = item.length > 20 ? item.substring(0, 17) + '...' : item;
-            } else {
-              thirdPartySelect.textContent = `${thirdPartyCount} Selected`;
-            }
-          } else {
-            thirdPartySelect.textContent = 'None Required';
-          }
+      // Update Code tab
+      if (cachedMobileElements.codeSelect) {
+        const codeCount = currentState.codeCount;
+        if (codeCount > 0) {
+          const selectedItems = Array.from(state.selectedCodes);
+          cachedMobileElements.codeSelect.textContent = codeCount === 1 ? 
+            selectedItems[0] : `${codeCount} Codes`;
+        } else {
+          cachedMobileElements.codeSelect.textContent = 'All Activities';
         }
       }
+      
+      // Update Third Party tab
+      if (cachedMobileElements.thirdPartySelect) {
+        const thirdPartyCount = currentState.thirdPartyCount;
+        if (thirdPartyCount > 0) {
+          const selectedItems = Array.from(state.selectedThirdParties);
+          if (thirdPartyCount === 1) {
+            const item = selectedItems[0];
+            cachedMobileElements.thirdPartySelect.textContent = item.length > 20 ? 
+              item.substring(0, 17) + '...' : item;
+          } else {
+            cachedMobileElements.thirdPartySelect.textContent = `${thirdPartyCount} Selected`;
+          }
+        } else {
+          cachedMobileElements.thirdPartySelect.textContent = 'None Required';
+        }
+      }
+
+      // Update last state
+      lastMobileState = currentState;
     }
     
+    // Debounced versions of update functions for better performance
+    const debouncedUpdateMobileDisplay = debounce(updateMobileSortingDisplay, 100);
+    const debouncedApplyMobileFilters = debounce(applyMobileFilters, 200);
+
     function handleMobileCheckboxSelection(type, item, checkbox) {
+      // Early return if mobile performance is critical and we're on desktop
+      if (!isMobileView()) {
+        return handleDesktopCheckboxSelection(type, item, checkbox);
+      }
 
-    // Debug: Check which container this checkbox belongs to
-    const container = checkbox.closest('.bal-dropdown-checkbox-wrap.select-listing');
-    const modal = checkbox.closest('[data-id]');
-    const modalId = modal?.getAttribute('data-id');
+      // Check which container this checkbox belongs to
+      const container = checkbox.closest('.bal-dropdown-checkbox-wrap.select-listing');
+      const modal = checkbox.closest('[data-id]');
+      const modalId = modal?.getAttribute('data-id');
 
-    // Additional debug: Check if the type matches the modal
-    if (modalId && modalId !== type) {
-      
-
-      type = modalId; // Fix the type based on the actual modal
-    }
-      
+      // Check if the type matches the modal
+      if (modalId && modalId !== type) {
+        type = modalId; // Fix the type based on the actual modal
+      }
+        
       // Get the current state of the checkbox
       const isChecked = checkbox.checked;
       const customCheckbox = checkbox.closest('label')?.querySelector('.w-checkbox-input');
 
-    // Note: "Select All" functionality removed - no longer needed
-    
-    // Handle individual item selection (multi-select)
-    const selectedSet = getSelectedSetByType(type);
-    
-    // IMPORTANT: Ensure visual and input states are synchronized
-        if (customCheckbox) {
-      if (isChecked) {
+      // Note: "Select All" functionality removed - no longer needed
+      
+      // Handle individual item selection (multi-select)
+      const selectedSet = getSelectedSetByType(type);
+      
+      // IMPORTANT: Ensure visual and input states are synchronized
+      if (customCheckbox) {
+        if (isChecked) {
           customCheckbox.classList.add('w--redirected-checked');
-      } else {
-        customCheckbox.classList.remove('w--redirected-checked');
+        } else {
+          customCheckbox.classList.remove('w--redirected-checked');
         }
       }
       
       if (isChecked) {
         // Add to selection
         selectedSet.add(item);
-
       } else {
         // Remove from selection
         selectedSet.delete(item);
+      }
 
+      // Use debounced updates for better performance
+      debouncedUpdateMobileDisplay();
+      debouncedApplyMobileFilters();
     }
 
-    // Note: No "Select All" to uncheck anymore
+    // Separate handler for desktop to avoid mobile-specific overhead
+    function handleDesktopCheckboxSelection(type, item, checkbox) {
+      const isChecked = checkbox.checked;
+      const selectedSet = getSelectedSetByType(type);
       
-      // Update display and apply filters
-      updateMobileSortingDisplay(); // Update tab display
+      if (isChecked) {
+        selectedSet.add(item);
+      } else {
+        selectedSet.delete(item);
+      }
+      
+      // Desktop can handle immediate updates
+      updateMobileSortingDisplay();
       applyMobileFilters();
     }
     
@@ -2597,216 +2649,202 @@
       
       // Verify container elements are valid based on view type
       if (isMobile && !dom.mobileListEl) {
-
         return;
       } else if (!isMobile && !dom.tableBodyEl) {
-
         return;
       }
       
       // Only clear the container if not appending
       if (!append) {
         if (isMobile) {
-        
           dom.mobileListEl.innerHTML = '';
         } else {
-        
-      dom.tableBodyEl.innerHTML = '';
+          dom.tableBodyEl.innerHTML = '';
         }
-      } else {
-      
       }
   
       if (data?.length > 0) {
-      
-        data.forEach((item, index) => {
-
-          if (isMobile) {
-            // Render mobile version
-            const mobileItem = createMobileItem(item);
-            dom.mobileListEl.appendChild(mobileItem);
-          } else {
-            // Render desktop table version
-          const row = document.createElement('tr');
-          row.className = 'table_row';
-          
-          // Create cells for each column
-          // Code column
-          const codeCell = document.createElement('td');
-          codeCell.className = 'table_cell';
-          codeCell.textContent = item.Code || '';
-          row.appendChild(codeCell);
-          
-          // Group column
-          const groupCell = document.createElement('td');
-          groupCell.className = 'table_cell';
-          groupCell.textContent = item.Group || '';
-          row.appendChild(groupCell);
-          
-          // Category column
-          const categoryCell = document.createElement('td');
-          categoryCell.className = 'table_cell';
-          categoryCell.textContent = item.Category || '';
-          row.appendChild(categoryCell);
-          
-          // Activity Name column with icons
-          const nameCell = document.createElement('td');
-          nameCell.className = 'table_cell';
-          
-          const nameDiv = document.createElement('div');
-          nameDiv.className = 'bal-table-td-div';
-          
-          const nameText = document.createElement('p');
-          nameText.className = 'td-text';
-          nameText.textContent = item['Activity Name'] || '';
-          nameDiv.appendChild(nameText);
-          
-          // Add icons container
-          const iconsDiv = document.createElement('div');
-          iconsDiv.className = 'bal-name-td-icons';
-          
-          // Copy button
-          const copyBtnDiv = document.createElement('div');
-          copyBtnDiv.className = 'code-embed-150 w-embed';
-          const copyButton = document.createElement('button');
-          copyButton.type = 'submit';
-          copyButton.className = 'btn-copy';
-          copyButton.setAttribute('aria-label', 'Copy');
-          copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="13" viewBox="0 0 10 13" fill="none">
-  <path d="M5.5 10.5C6.1628 10.4992 6.79822 10.2356 7.26689 9.7669C7.73556 9.29823 7.99921 8.66281 8 8.00001V3.62151C8.00078 3.35869 7.94938 3.09833 7.84879 2.85552C7.7482 2.61271 7.60041 2.39228 7.414 2.20701L6.293 1.08601C6.10773 0.899596 5.8873 0.75181 5.64449 0.651219C5.40168 0.550627 5.14132 0.499231 4.8785 0.500009H2.5C1.8372 0.500803 1.20178 0.76445 0.73311 1.23312C0.264441 1.70179 0.000793929 2.33721 0 3.00001V8.00001C0.000793929 8.66281 0.264441 9.29823 0.73311 9.7669C1.20178 10.2356 1.8372 10.4992 2.5 10.5H5.5ZM1 8.00001V3.00001C1 2.60218 1.15804 2.22065 1.43934 1.93935C1.72064 1.65804 2.10218 1.50001 2.5 1.50001C2.5 1.50001 4.9595 1.50701 5 1.51201V2.50001C5 2.76523 5.10536 3.01958 5.29289 3.20712C5.48043 3.39465 5.73478 3.50001 6 3.50001H6.988C6.993 3.54051 7 8.00001 7 8.00001C7 8.39783 6.84196 8.77936 6.56066 9.06067C6.27936 9.34197 5.89782 9.50001 5.5 9.50001H2.5C2.10218 9.50001 1.72064 9.34197 1.43934 9.06067C1.15804 8.77936 1 8.39783 1 8.00001ZM10 4.50001V10C9.99921 10.6628 9.73556 11.2982 9.26689 11.7669C8.79822 12.2356 8.1628 12.4992 7.5 12.5H3C2.86739 12.5 2.74021 12.4473 2.64645 12.3536C2.55268 12.2598 2.5 12.1326 2.5 12C2.5 11.8674 2.55268 11.7402 2.64645 11.6465C2.74021 11.5527 2.86739 11.5 3 11.5H7.5C7.89782 11.5 8.27936 11.342 8.56066 11.0607C8.84196 10.7794 9 10.3978 9 10V4.50001C9 4.3674 9.05268 4.24022 9.14645 4.14646C9.24021 4.05269 9.36739 4.00001 9.5 4.00001C9.63261 4.00001 9.75979 4.05269 9.85355 4.14646C9.94732 4.24022 10 4.3674 10 4.50001Z" fill="black" fill-opacity="0.6"/>
-            </svg>`;
-          
-          // Add click event to copy activity name
-          copyButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent row click
-            const textToCopy = item['Activity Name'] || '';
-            navigator.clipboard.writeText(textToCopy)
-              .then(() => {
-                // Show feedback
-                const originalColor = copyButton.style.color;
-                copyButton.style.color = '#056633'; // Success color
-                setTimeout(() => {
-                  copyButton.style.color = originalColor;
-                }, 1000);
-              })
-              .catch(err => {
-                // 
-              });
-          });
-          
-          copyBtnDiv.appendChild(copyButton);
-          
-          // Save button
-          const saveBtnDiv = document.createElement('div');
-          saveBtnDiv.className = 'code-embed-150 w-embed';
-          const saveButton = document.createElement('button');
-          saveButton.type = 'submit';
-          saveButton.className = 'btn-save';
-          saveButton.setAttribute('aria-label', 'Save');
-          saveButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="13" viewBox="0 0 11 13" fill="none">
-  <path d="M8.49902 1.05273L8.69727 1.0625C9.15499 1.10845 9.58495 1.31153 9.91309 1.63965C10.2412 1.96777 10.4443 2.39776 10.4902 2.85547L10.5 3.05371V10.9482C10.5022 11.1444 10.4455 11.3367 10.3369 11.5C10.2281 11.6635 10.0717 11.7906 9.88965 11.8643L9.88477 11.8662C9.76055 11.9183 9.62686 11.9448 9.49219 11.9453C9.36339 11.9449 9.23598 11.9199 9.11719 11.8701C8.99793 11.8201 8.88961 11.7464 8.79883 11.6543L8.79492 11.6514L5.85254 8.72461L5.5 8.37402L5.14746 8.72461L2.20508 11.6514L2.20117 11.6553C2.06351 11.795 1.88679 11.8897 1.69434 11.9277C1.54982 11.9562 1.40114 11.9517 1.25977 11.915L1.12109 11.8682L1.11133 11.8643L0.980469 11.7988C0.854533 11.7245 0.745917 11.6227 0.664062 11.5C0.555089 11.3366 0.497867 11.1437 0.5 10.9473V3.05371C0.500635 2.52333 0.711894 2.01469 1.08691 1.63965C1.41502 1.31155 1.84505 1.10849 2.30273 1.0625L2.50098 1.05273H8.49902Z" stroke="#06603A"/>
-            </svg>`;
-          
-          // Add click event to save/bookmark activity
-          saveButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent row click
-            toggleSavedItem(item, saveButton, row);
-          });
-          
-          // Check if this activity is already saved
-          if (isItemSaved(item.Code)) {
-            saveButton.classList.add('saved');
-            saveButton.querySelector('svg path').setAttribute('stroke', '#06603A');
-            row.classList.add('is-saved'); // Also mark the row as saved
-          }
-          
-          saveBtnDiv.appendChild(saveButton);
-          
-          iconsDiv.appendChild(copyBtnDiv);
-          iconsDiv.appendChild(saveBtnDiv);
-          nameDiv.appendChild(iconsDiv);
-          nameCell.appendChild(nameDiv);
-          row.appendChild(nameCell);
-          
-          // Third Party column
-          const thirdPartyCell = document.createElement('td');
-          thirdPartyCell.className = 'table_cell';
-          thirdPartyCell.textContent = item['Third Party'] || 'N/A';
-          row.appendChild(thirdPartyCell);
-          
-          // When column
-          const whenCell = document.createElement('td');
-          whenCell.className = 'table_cell';
-          whenCell.textContent = item['When'] || 'N/A';
-          row.appendChild(whenCell);
-          
-          // Notes column
-          const notesCell = document.createElement('td');
-          notesCell.className = 'table_cell';
-          notesCell.textContent = item['Notes'] || 'N/A';
-          row.appendChild(notesCell);
-          
-          // Risk Rating column
-          const riskRatingCell = document.createElement('td');
-          riskRatingCell.className = 'table_cell';
-          riskRatingCell.textContent = item['Risk Rating'] || 'N/A';
-          row.appendChild(riskRatingCell);
-          
-          // DNFBP column
-          const dnfbpCell = document.createElement('td');
-          dnfbpCell.className = 'table_cell';
-          dnfbpCell.textContent = item['DNFBP'] || 'N/A';
-          row.appendChild(dnfbpCell);
-          
-          // Store all item data as a data attribute for modal display
-          row.dataset.activityData = JSON.stringify(item);
-          
-          // Store activity code for reference (used for saved items sync)
-          row.dataset.activityCode = item.Code;
-          
-          // Add click event to show modal with activity details
-          row.style.cursor = 'pointer';
-          row.addEventListener('click', (event) => {
-            event.stopPropagation();
-            showActivityDetailsModal(item);
-          });
-          
-          dom.tableBodyEl.appendChild(row);
-          }
-        });
-      } else {
-      
+        // Mobile-specific performance optimizations
         if (isMobile) {
-          // Mobile no results message
-          const noResultsDiv = document.createElement('div');
-          noResultsDiv.className = 'no-results-mobile';
-          noResultsDiv.textContent = 'No activities found matching your criteria.';
-          noResultsDiv.style.cssText = 'text-align: center; padding: 40px 20px; color: #666;';
-          dom.mobileListEl.appendChild(noResultsDiv);
+          renderMobileResults(data, append);
         } else {
-          // Desktop no results message
-        const noResultsRow = document.createElement('tr');
-        noResultsRow.className = 'table_row';
-        const noResultsCell = document.createElement('td');
-        noResultsCell.colSpan = 9; // Updated to match the total number of columns
-        noResultsCell.className = 'table_cell';
-        noResultsCell.textContent = 'No activities found matching your criteria.';
-        noResultsCell.style.textAlign = 'center';
-        noResultsCell.style.padding = '20px';
-        noResultsRow.appendChild(noResultsCell);
-        
-        try {
-        dom.tableBodyEl.appendChild(noResultsRow);
-          
-        } catch (err) {
-            // 
-          }
+          renderDesktopResults(data, append);
+        }
+      } else {
+        // Handle no results case
+        if (isMobile) {
+          dom.mobileListEl.innerHTML = '<div class="no-results">No activities found</div>';
+        } else {
+          dom.tableBodyEl.innerHTML = '<tr><td colspan="100%" class="no-results">No activities found</td></tr>';
         }
       }
   
-      state.currentPage = page;
+      // Update pagination info
+      updatePaginationInfo(count, page);
+    }
+
+    // Separate mobile rendering function for better performance
+    function renderMobileResults(data, append) {
+      // Use DocumentFragment for better performance
+      const fragment = document.createDocumentFragment();
       
-      // No pagination needed for infinite scroll
+      // Batch DOM operations
+      data.forEach((item, index) => {
+        const mobileItem = createMobileItem(item);
+        fragment.appendChild(mobileItem);
+      });
+      
+      // Single DOM append operation
+      dom.mobileListEl.appendChild(fragment);
+    }
+
+    // Separate desktop rendering function
+    function renderDesktopResults(data, append) {
+      // Use DocumentFragment for better performance
+      const fragment = document.createDocumentFragment();
+      
+      data.forEach((item, index) => {
+        const row = createDesktopTableRow(item);
+        fragment.appendChild(row);
+      });
+      
+      // Single DOM append operation
+      dom.tableBodyEl.appendChild(fragment);
+    }
+
+    // Helper function to create desktop table row
+    function createDesktopTableRow(item) {
+      const row = document.createElement('tr');
+      row.className = 'table_row';
+      
+      // Create cells for each column
+      // Code column
+      const codeCell = document.createElement('td');
+      codeCell.className = 'table_cell';
+      codeCell.textContent = item.Code || '';
+      row.appendChild(codeCell);
+      
+      // Group column
+      const groupCell = document.createElement('td');
+      groupCell.className = 'table_cell';
+      groupCell.textContent = item.Group || '';
+      row.appendChild(groupCell);
+      
+      // Category column
+      const categoryCell = document.createElement('td');
+      categoryCell.className = 'table_cell';
+      categoryCell.textContent = item.Category || '';
+      row.appendChild(categoryCell);
+      
+      // Activity Name column with icons
+      const nameCell = document.createElement('td');
+      nameCell.className = 'table_cell';
+      
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'bal-table-td-div';
+      
+      const nameText = document.createElement('p');
+      nameText.className = 'td-text';
+      nameText.textContent = item['Activity Name'] || '';
+      nameDiv.appendChild(nameText);
+      
+      // Add icons container
+      const iconsDiv = document.createElement('div');
+      iconsDiv.className = 'bal-name-td-icons';
+      
+      // Copy button
+      const copyBtnDiv = document.createElement('div');
+      copyBtnDiv.className = 'code-embed-150 w-embed';
+      const copyButton = document.createElement('button');
+      copyButton.type = 'submit';
+      copyButton.className = 'btn-copy';
+      copyButton.setAttribute('aria-label', 'Copy');
+      copyButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="13" viewBox="0 0 10 13" fill="none">
+<path d="M5.5 10.5C6.1628 10.4992 6.79822 10.2356 7.26689 9.7669C7.73556 9.29823 7.99921 8.66281 8 8.00001V3.62151C8.00078 3.35869 7.94938 3.09833 7.84879 2.85552C7.7482 2.61271 7.60041 2.39228 7.414 2.20701L6.293 1.08601C6.10773 0.899596 5.8873 0.75181 5.64449 0.651219C5.40168 0.550627 5.14132 0.499231 4.8785 0.500009H2.5C1.8372 0.500803 1.20178 0.76445 0.73311 1.23312C0.264441 1.70179 0.000793929 2.33721 0 3.00001V8.00001C0.000793929 8.66281 0.264441 9.29823 0.73311 9.7669C1.20178 10.2356 1.8372 10.4992 2.5 10.5H5.5ZM1 8.00001V3.00001C1 2.60218 1.15804 2.22065 1.43934 1.93935C1.72064 1.65804 2.10218 1.50001 2.5 1.50001C2.5 1.50001 4.9595 1.50701 5 1.51201V2.50001C5 2.76523 5.10536 3.01958 5.29289 3.20712C5.48043 3.39465 5.73478 3.50001 6 3.50001H6.988C6.993 3.54051 7 8.00001 7 8.00001C7 8.39783 6.84196 8.77936 6.56066 9.06067C6.27936 9.34197 5.89782 9.50001 5.5 9.50001H2.5C2.10218 9.50001 1.72064 9.34197 1.43934 9.06067C1.15804 8.77936 1 8.39783 1 8.00001ZM10 4.50001V10C9.99921 10.6628 9.73556 11.2982 9.26689 11.7669C8.79822 12.2356 8.1628 12.4992 7.5 12.5H3C2.86739 12.5 2.74021 12.4473 2.64645 12.3536C2.55268 12.2598 2.5 12.1326 2.5 12C2.5 11.8674 2.55268 11.7402 2.64645 11.6465C2.74021 11.5527 2.86739 11.5 3 11.5H7.5C7.89782 11.5 8.27936 11.342 8.56066 11.0607C8.84196 10.7794 9 10.3978 9 10V4.50001C9 4.3674 9.05268 4.24022 9.14645 4.14646C9.24021 4.05269 9.36739 4.00001 9.5 4.00001C9.63261 4.00001 9.75979 4.05269 9.85355 4.14646C9.94732 4.24022 10 4.3674 10 4.50001Z" fill="black" fill-opacity="0.6"/>
+          </svg>`;
+      
+      // Event handling now done via delegation for better performance
+      
+      copyBtnDiv.appendChild(copyButton);
+      
+      // Save button
+      const saveBtnDiv = document.createElement('div');
+      saveBtnDiv.className = 'code-embed-150 w-embed';
+      const saveButton = document.createElement('button');
+      saveButton.type = 'submit';
+      saveButton.className = 'btn-save';
+      saveButton.setAttribute('aria-label', 'Save');
+      saveButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="13" viewBox="0 0 11 13" fill="none">
+<path d="M8.49902 1.05273L8.69727 1.0625C9.15499 1.10845 9.58495 1.31153 9.91309 1.63965C10.2412 1.96777 10.4443 2.39776 10.4902 2.85547L10.5 3.05371V10.9482C10.5022 11.1444 10.4455 11.3367 10.3369 11.5C10.2281 11.6635 10.0717 11.7906 9.88965 11.8643L9.88477 11.8662C9.76055 11.9183 9.62686 11.9448 9.49219 11.9453C9.36339 11.9449 9.23598 11.9199 9.11719 11.8701C8.99793 11.8201 8.88961 11.7464 8.79883 11.6543L8.79492 11.6514L5.85254 8.72461L5.5 8.37402L5.14746 8.72461L2.20508 11.6514L2.20117 11.6553C2.06351 11.795 1.88679 11.8897 1.69434 11.9277C1.54982 11.9562 1.40114 11.9517 1.25977 11.915L1.12109 11.8682L1.11133 11.8643L0.980469 11.7988C0.854533 11.7245 0.745917 11.6227 0.664062 11.5C0.555089 11.3366 0.497867 11.1437 0.5 10.9473V3.05371C0.500635 2.52333 0.711894 2.01469 1.08691 1.63965C1.41502 1.31155 1.84505 1.10849 2.30273 1.0625L2.50098 1.05273H8.49902Z" stroke="#06603A"/>
+          </svg>`;
+      
+      // Event handling now done via delegation for better performance
+      
+      // Check if this activity is already saved
+      if (isItemSaved(item.Code)) {
+        saveButton.classList.add('saved');
+        saveButton.querySelector('svg path').setAttribute('stroke', '#06603A');
+        row.classList.add('is-saved'); // Also mark the row as saved
+      }
+      
+      saveBtnDiv.appendChild(saveButton);
+      
+      iconsDiv.appendChild(copyBtnDiv);
+      iconsDiv.appendChild(saveBtnDiv);
+      nameDiv.appendChild(iconsDiv);
+      nameCell.appendChild(nameDiv);
+      row.appendChild(nameCell);
+      
+      // Third Party column
+      const thirdPartyCell = document.createElement('td');
+      thirdPartyCell.className = 'table_cell';
+      thirdPartyCell.textContent = item['Third Party'] || 'N/A';
+      row.appendChild(thirdPartyCell);
+      
+      // When column
+      const whenCell = document.createElement('td');
+      whenCell.className = 'table_cell';
+      whenCell.textContent = item['When'] || 'N/A';
+      row.appendChild(whenCell);
+      
+      // Notes column
+      const notesCell = document.createElement('td');
+      notesCell.className = 'table_cell';
+      notesCell.textContent = item['Notes'] || 'N/A';
+      row.appendChild(notesCell);
+      
+      // Risk Rating column
+      const riskRatingCell = document.createElement('td');
+      riskRatingCell.className = 'table_cell';
+      riskRatingCell.textContent = item['Risk Rating'] || 'N/A';
+      row.appendChild(riskRatingCell);
+      
+      // DNFBP column
+      const dnfbpCell = document.createElement('td');
+      dnfbpCell.className = 'table_cell';
+      dnfbpCell.textContent = item['DNFBP'] || 'N/A';
+      row.appendChild(dnfbpCell);
+      
+      // Store all item data as a data attribute for modal display
+      row.dataset.activityData = JSON.stringify(item);
+      
+      // Store activity code for reference (used for saved items sync)
+      row.dataset.activityCode = item.Code;
+      
+      // Add click event to show modal with activity details
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', (event) => {
+        event.stopPropagation();
+        showActivityDetailsModal(item);
+      });
+      
+      return row;
+    }
+
+    // Helper function to update pagination info
+    function updatePaginationInfo(count, page) {
+      state.currentPage = page;
+      // Update any pagination UI elements if needed
     }
     
     // Helper function to show activity details in a modal
@@ -5101,15 +5139,19 @@
       let scrollTimeout;
       let isLoading = false;
       
-      window.addEventListener('scroll', () => {
+      // Use passive event listeners for better performance
+      const scrollHandler = () => {
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
           // Check if we're near the bottom of the page
           const scrollPosition = window.scrollY + window.innerHeight;
           const documentHeight = document.documentElement.scrollHeight;
           
-          // Load more when user scrolls to 80% of the page
-          if (scrollPosition > documentHeight * 0.8 && !isLoading) {
+          // Different thresholds for mobile vs desktop
+          const threshold = isMobileView() ? 0.9 : 0.8; // Mobile loads later to reduce battery usage
+          
+          // Load more when user scrolls to threshold of the page
+          if (scrollPosition > documentHeight * threshold && !isLoading) {
       ("Scroll threshold reached, loading more data");
             isLoading = true;
             
@@ -5119,8 +5161,10 @@
               isLoading = false;
             });
           }
-        }, 100);
-      });
+        }, isMobileView() ? 150 : 100); // Longer debounce on mobile
+      };
+      
+      window.addEventListener('scroll', scrollHandler, { passive: true });
     }
   
     // ─── Handle window resize for responsive switching ─────────────
@@ -5128,18 +5172,78 @@
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
+        // Clear cache on view change to force re-render with correct layout
+        cachedMobileElements = null;
+        lastMobileState = null;
+        
         // Re-render current page when switching between mobile/desktop
         if (state.currentPage) {
           renderPage(state.currentPage);
         }
       }, 300); // Debounce resize events
     });
+
+    // ─── Event Delegation for Better Performance ─────────────────
+    function setupEventDelegation() {
+      // Delegate click events for better performance
+      document.addEventListener('click', (e) => {
+        // Handle copy button clicks
+        if (e.target.closest('.btn-copy')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const copyBtn = e.target.closest('.btn-copy');
+          const row = copyBtn.closest('tr, .bal-wrapper');
+          
+          let activityName = '';
+          if (row.dataset.activityData) {
+            const data = JSON.parse(row.dataset.activityData);
+            activityName = data['Activity Name'] || '';
+          } else {
+            // Fallback for mobile items
+            const nameElement = row.querySelector('.bal-category-item-name, .td-text');
+            activityName = nameElement ? nameElement.textContent : '';
+          }
+          
+          if (activityName) {
+            navigator.clipboard.writeText(activityName)
+              .then(() => {
+                // Show feedback
+                const originalColor = copyBtn.style.color;
+                copyBtn.style.color = '#056633';
+                setTimeout(() => {
+                  copyBtn.style.color = originalColor;
+                }, 1000);
+              })
+              .catch(err => {
+                // Handle error silently
+              });
+          }
+        }
+        
+        // Handle save button clicks
+        if (e.target.closest('.btn-save')) {
+          e.preventDefault();
+          e.stopPropagation();
+          const saveBtn = e.target.closest('.btn-save');
+          const row = saveBtn.closest('tr, .bal-wrapper');
+          
+          if (row.dataset.activityData) {
+            const data = JSON.parse(row.dataset.activityData);
+            toggleSavedItem(data, saveBtn, row);
+          }
+        }
+      });
+    }
   
     // ─── Start on DOM ready ────────────────────────────────────────
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initialize);
+      document.addEventListener('DOMContentLoaded', () => {
+        initialize();
+        setupEventDelegation();
+      });
     } else {
       initialize();
+      setupEventDelegation();
     }
   
   })();
