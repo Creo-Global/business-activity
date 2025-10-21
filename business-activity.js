@@ -129,14 +129,19 @@
     // Mobile saved items container
     savedMobileContainer: document.querySelector('.bal-wrapper.for-mobile.saaved-items, .bal-wrapper.for-mobile.saved-items'),
     // Third party approval elements
-  thirdPartyToggle: document.querySelector('#select_all_item'),
+    thirdPartyToggle: document.querySelector('#select_all, #select_all_item'),
     thirdPartyDropdown: document.querySelector('.third-party-approval'),
     thirdPartyCheckboxes: document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]'),
     unselectAllBtn: document.querySelector('.unselect-all'),
-    resetBtn: document.querySelector('.reset-item'),
+    resetBtn: document.querySelector('.reset-item, .reset-all'),
   };
 
       // ─── Utility Functions ─────────────────────────────────────────
+
+  // Helper to fire a change event so any UI library (e.g., Webflow) updates visuals
+  function triggerChange(el) {
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
 
   function isMobileView() {
     return window.innerWidth <= 991; // Mobile view starts at 991px and below
@@ -276,6 +281,10 @@
     // Add click event to show modal
     balItem.style.cursor = 'pointer';
     balItem.addEventListener('click', (event) => {
+      // Ignore clicks on buttons (copy, save, etc.)
+      if (event.target.closest('.btn-copy, .btn-save, button')) {
+        return;
+      }
       event.stopPropagation();
       showActivityDetailsModal(item);
     });
@@ -426,6 +435,10 @@
     // Add click event to show modal
     balItem.style.cursor = 'pointer';
     balItem.addEventListener('click', (event) => {
+      // Ignore clicks on buttons (copy, save, etc.)
+      if (event.target.closest('.btn-copy, .btn-save, button')) {
+        return;
+      }
       event.stopPropagation();
       showActivityDetailsModal(item);
     });
@@ -571,7 +584,7 @@
         dom.mobileCategoriesCheckboxContainer = categoriesCheckboxContainer;
       }
     } else {
-    
+  
     }
     
     if (codeModal) {
@@ -2873,6 +2886,10 @@ function openFilterModal(modalId) {
     // Add click event to show modal with activity details
     row.style.cursor = 'pointer';
     row.addEventListener('click', (event) => {
+      // Ignore clicks on buttons (copy, save, etc.)
+      if (event.target.closest('.btn-copy, .btn-save, button, a')) {
+        return;
+      }
       event.stopPropagation();
       showActivityDetailsModal(item);
     });
@@ -4718,162 +4735,239 @@ function setupModalManagement() {
 
 // Set up third party approval toggle and checkboxes
 async function setupThirdPartyFilter() {
-("Setting up third party approval filter...");
-    
-    // Check if the toggle exists
-    if (!dom.thirdPartyToggle) {
-      // 
-      return;
-    }
-    
-("Third party toggle found");
-    
-    // Fetch third parties from API and populate checkboxes
+  // Fetch third parties from API first
     try {
       const thirdParties = await fetchThirdParties();
       if (thirdParties.length > 0) {
         populateThirdPartyCheckboxes(thirdParties);
       } else {
-        // 
       }
     } catch (error) {
-      // 
+  }
+  
+  // Setup for each third-party approval widget container (desktop/mobile)
+  document.querySelectorAll('.third-party-approval').forEach(function (wrap) {
+    // Try multiple selectors to find the master toggle
+    const master = wrap.querySelector('#select_all') || 
+                   wrap.querySelector('#select_all_item') || 
+                   wrap.querySelector('.bal-third-party-select .toggle input[type="checkbox"]') ||
+                   wrap.querySelector('.toggle input[type="checkbox"]');
+    
+    if (!master) {
+      return;
     }
     
-    // Set up the main toggle
-    dom.thirdPartyToggle.addEventListener('change', (event) => {
-    const isToggleOn = event.target.checked;
-    state.thirdPartyApproval = isToggleOn;
 
-    // When toggle is ON, select all third-party checkboxes
-    // When toggle is OFF, deselect all third-party checkboxes
-    const thirdPartyModal = document.querySelector('[data-id="thirdparty"]');
-    if (thirdPartyModal) {
-      const checkboxItems = thirdPartyModal.querySelectorAll('.bal-dropdown-link.select-category');
+    // Get all third-party checkboxes - try multiple container selectors
+    const getItemCheckboxes = () => {
+      // First try getting from .bal-dropdown-checkbox-wrap (dynamically populated)
+      let checkboxes = wrap.querySelectorAll('.bal-dropdown-checkbox-wrap input[type="checkbox"]');
+      if (checkboxes.length === 0) {
+        // Fallback to .bal-select-options (if exists in HTML)
+        checkboxes = wrap.querySelectorAll('.bal-select-options input[type="checkbox"]');
+      }
+      if (checkboxes.length === 0) {
+        // Last fallback to any .bal-dropdown-link checkboxes
+        checkboxes = wrap.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
+      }
+      return checkboxes;
+    };
 
-      checkboxItems.forEach((checkboxItem, index) => {
-        const input = checkboxItem.querySelector('input[type="checkbox"]');
-        const customCheckbox = checkboxItem.querySelector('.w-checkbox-input');
-        const label = checkboxItem.querySelector('.bal-checkbox-label');
-        const thirdPartyName = label?.textContent?.trim();
-        
-        if (input && customCheckbox && thirdPartyName) {
+    // Apply state to all item checkboxes and update state
+    const setAllItems = (checked) => {
+      const checkboxes = getItemCheckboxes();
+      
+      // Clear or populate selectedThirdParties based on checked state
+      if (!checked) {
+        state.selectedThirdParties.clear();
+      }
+      
+      checkboxes.forEach(function (cb) {
+        if (cb.checked !== checked) {
           // Update checkbox state
-          input.checked = isToggleOn;
+          cb.checked = checked;
           
-          // Update visual state
-          if (isToggleOn) {
-            customCheckbox.classList.add('w--redirected-checked');
-            state.selectedThirdParties.add(thirdPartyName);
-
+          // Trigger change event for any listeners
+          triggerChange(cb);
+          
+          // Update state
+          const thirdPartyName = cb.dataset.name || cb.nextElementSibling?.nextElementSibling?.textContent?.trim();
+          if (thirdPartyName) {
+            if (checked) {
+              state.selectedThirdParties.add(thirdPartyName);
           } else {
-            customCheckbox.classList.remove('w--redirected-checked');
             state.selectedThirdParties.delete(thirdPartyName);
-
+            }
           }
         }
       });
 
+      // Update visual state for ALL checkboxes after state updates
+      // Use setTimeout to ensure it happens after Webflow's processing
+      setTimeout(() => {
+        checkboxes.forEach(function (cb) {
+          const customCheckbox = cb.nextElementSibling;
+          if (customCheckbox && customCheckbox.classList.contains('w-checkbox-input')) {
+            if (cb.checked) {
+              customCheckbox.classList.add('w--redirected-checked');
     } else {
-
+              customCheckbox.classList.remove('w--redirected-checked');
     }
+          }
+        });
+      }, 50);
     
-    // Update the tab display to show the new selection count
+      updateMasterState();
+    
+      // Update mobile sorting display
     updateMobileSortingDisplay();
       
       // Reset to first page and reload data
       state.currentPage = 1;
-      cache.clear(); // Clear cache when changing filters
+      cache.clear();
       renderPage(1);
-    });
-    
-    // Set up event delegation for checkbox changes - use document level delegation
-    // to catch events regardless of where the checkboxes are in the DOM
-  // BUT ONLY for third-party modal checkboxes
-    document.addEventListener('change', (event) => {
-      // Check if the changed element is a checkbox in our dropdown
-      if (event.target.type === 'checkbox' && 
-          (event.target.closest('.bal-dropdown-checkbox-wrap') || 
-           event.target.closest('.bal-select-items-wrap'))) {
-        
-      // IMPORTANT: Only handle checkboxes that are in the third-party modal
-      const thirdPartyModal = event.target.closest('[data-id="thirdparty"]');
-      if (!thirdPartyModal) {
+    };
 
-        return; // Skip if not in third-party modal
+    // Keep master checkbox state (checked/indeterminate) in sync with items
+    // But ONLY when clicking individual items, not when clicking the master
+    const updateMasterState = (skipFilter = false) => {
+      const items = Array.from(getItemCheckboxes());
+      const total = items.length;
+      const checkedCount = items.filter(cb => cb.checked).length;
+
+      if (checkedCount === 0) {
+        master.indeterminate = false;
+        master.checked = false;
+      } else if (checkedCount === total) {
+        master.indeterminate = false;
+        master.checked = true;
+      } else {
+        master.indeterminate = true;
       }
+    };
+
+    // Handle clicks on the toggle area (label, slider, etc)
+    const handleToggleClick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
       
-        const thirdPartyName = event.target.nextElementSibling?.textContent?.trim();
-        if (!thirdPartyName) return;
+      // Toggle the state manually
+      const newState = !master.checked;
+      master.checked = newState;
+      
+      
+      state.thirdPartyApproval = newState;
+      setAllItems(newState);
+    };
+    
+    // Add click handler to the label (which wraps the checkbox)
+    const toggleLabel = wrap.querySelector('label.switch[for="select_all"], label.switch[for="select_all_item"]');
+    if (toggleLabel) {
+      toggleLabel.addEventListener('click', handleToggleClick);
+    }
+    
+    // Also add to the slider itself
+    const slider = wrap.querySelector('.slider');
+    if (slider) {
+      slider.addEventListener('click', handleToggleClick);
+    }
 
-        if (event.target.checked) {
-          // Add to selected third parties
-          state.selectedThirdParties.add(thirdPartyName);
-        } else {
-          // Remove from selected third parties
-          state.selectedThirdParties.delete(thirdPartyName);
+    // "Unselect All" button → uncheck master and all items (supports both class variants)
+    const unselectBtns = wrap.querySelectorAll(
+      '.bal-select-head .unselect-all, .bal-third-party-select-header .unselect-all'
+    );
+    
+    unselectBtns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (master.checked || master.indeterminate) {
+          master.indeterminate = false;
+          master.checked = false;
+          state.thirdPartyApproval = false;
+          triggerChange(master);
         }
+        setAllItems(false);
+      });
+    });
+    
+    // Also look for reset buttons
+    const resetBtns = wrap.querySelectorAll(
+      '.bal-select-head .reset-item, .bal-third-party-select-header .reset-item, .reset-all'
+    );
+    
+    resetBtns.forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (master.checked || master.indeterminate) {
+          master.indeterminate = false;
+          master.checked = false;
+          state.thirdPartyApproval = false;
+          triggerChange(master);
+        }
+        setAllItems(false);
+      });
+    });
 
+    // Keep master updated when user clicks individual items
+    wrap.addEventListener('change', function (e) {
+      // Check if the target is a third-party checkbox (not the master toggle)
+      if (e.target.type === 'checkbox' && 
+          e.target !== master &&
+          (e.target.matches('.bal-select-options input[type="checkbox"]') || 
+           e.target.matches('.bal-dropdown-link input[type="checkbox"]') ||
+           e.target.matches('.bal-dropdown-checkbox-wrap input[type="checkbox"]'))) {
+        
+        // Update visual state for custom checkboxes
+        const customCheckbox = e.target.nextElementSibling;
+        const isChecked = e.target.checked;
+        
+        if (customCheckbox && customCheckbox.classList.contains('w-checkbox-input')) {
+          // Apply the class immediately
+          if (isChecked) {
+            customCheckbox.classList.add('w--redirected-checked');
+          } else {
+            customCheckbox.classList.remove('w--redirected-checked');
+          }
+          
+          // Webflow might be removing our class, so re-apply it after a short delay
+          setTimeout(() => {
+            if (isChecked) {
+              customCheckbox.classList.add('w--redirected-checked');
+            } else {
+              customCheckbox.classList.remove('w--redirected-checked');
+            }
+          }, 50);
+        }
+        
+        // Update state - get the third party name from data-name attribute or label text
+        const thirdPartyName = e.target.dataset.name || 
+                               e.target.nextElementSibling?.nextElementSibling?.textContent?.trim();
+        if (thirdPartyName) {
+          if (e.target.checked) {
+            state.selectedThirdParties.add(thirdPartyName);
+          } else {
+            state.selectedThirdParties.delete(thirdPartyName);
+          }
+        }
+        
+        updateMasterState();
+        
+        // Update mobile sorting display
+        updateMobileSortingDisplay();
+        
         // Reset to first page and reload data
         state.currentPage = 1;
-        cache.clear(); // Clear cache when changing filters
+        cache.clear();
         renderPage(1);
       }
     });
-    
-    // Set up unselect all button
-    if (dom.unselectAllBtn) {
-      dom.unselectAllBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        
-        // Get current checkboxes (they might have been dynamically created)
-        const checkboxes = document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
-        
-        // Uncheck all checkboxes
-        checkboxes.forEach(checkbox => {
-          checkbox.checked = false;
-        });
-        
-        // Clear selected third parties
-        state.selectedThirdParties = [];
-  ("Cleared all selected third parties");
-        
-        // Reset to first page and reload data
-        state.currentPage = 1;
-        cache.clear(); // Clear cache when changing filters
-        renderPage(1);
-      });
-    }
-    
-    // Set up reset button
-    if (dom.resetBtn) {
-      dom.resetBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        
-        // Reset third party approval toggle
-      if (dom.thirdPartyToggle) {
-        dom.thirdPartyToggle.checked = false;
-      }
-        state.thirdPartyApproval = false;
-        
-        // Get current checkboxes (they might have been dynamically created)
-        const checkboxes = document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
-        
-        // Uncheck all checkboxes
-        checkboxes.forEach(checkbox => {
-          checkbox.checked = false;
-        });
-        
-        // Clear selected third parties
-        state.selectedThirdParties = [];
-  ("Reset third party filter");
-        
-        // Reset to first page and reload data
-        state.currentPage = 1;
-        cache.clear(); // Clear cache when changing filters
-        renderPage(1);
-      });
-    }
+
+    // Don't interfere with the toggle - let it work naturally
+    // The dropdown might close, but the toggle will work properly
+
+    // Initialize state on load
+    updateMasterState();
+  });
   }
   
   // ─── FAWRI Activities Toggle Setup ─────────────────────────────
@@ -5228,24 +5322,32 @@ async function setupThirdPartyFilter() {
     document.addEventListener('click', (e) => {
       // Handle copy button clicks
       if (e.target.closest('.btn-copy')) {
+        console.log("Copy button clicked!");
         e.preventDefault();
         e.stopPropagation();
         const copyBtn = e.target.closest('.btn-copy');
         const row = copyBtn.closest('tr, .bal-wrapper');
         
+        console.log("Row found:", row);
+        console.log("Row dataset:", row?.dataset);
+        
         let activityName = '';
-        if (row.dataset.activityData) {
+        if (row && row.dataset.activityData) {
           const data = JSON.parse(row.dataset.activityData);
           activityName = data['Activity Name'] || '';
+          console.log("Activity name from dataset:", activityName);
         } else {
           // Fallback for mobile items
-          const nameElement = row.querySelector('.bal-category-item-name, .td-text');
+          const nameElement = row?.querySelector('.bal-category-item-name, .td-text');
           activityName = nameElement ? nameElement.textContent : '';
+          console.log("Activity name from element:", activityName);
         }
         
         if (activityName) {
+          console.log("Copying to clipboard:", activityName);
           navigator.clipboard.writeText(activityName)
             .then(() => {
+              console.log("Copied successfully!");
               // Show feedback
               const originalColor = copyBtn.style.color;
               copyBtn.style.color = '#056633';
@@ -5254,21 +5356,30 @@ async function setupThirdPartyFilter() {
               }, 1000);
             })
             .catch(err => {
-              // Handle error silently
+              console.error("Copy failed:", err);
             });
+        } else {
+          console.log("No activity name found to copy");
         }
       }
       
       // Handle save button clicks
       if (e.target.closest('.btn-save')) {
+        console.log("Save button clicked!");
         e.preventDefault();
         e.stopPropagation();
         const saveBtn = e.target.closest('.btn-save');
         const row = saveBtn.closest('tr, .bal-wrapper');
         
-        if (row.dataset.activityData) {
+        console.log("Save row found:", row);
+        console.log("Save row dataset:", row?.dataset);
+        
+        if (row && row.dataset.activityData) {
           const data = JSON.parse(row.dataset.activityData);
+          console.log("Toggling saved item:", data);
           toggleSavedItem(data, saveBtn, row);
+        } else {
+          console.log("No activity data found for save");
         }
       }
     });
@@ -5285,99 +5396,6 @@ async function setupThirdPartyFilter() {
     setupEventDelegation();
   }
 
-})();
-
-//For - third-party-select
-(function () {
-// Helper to fire a change event so any UI library (e.g., Webflow) updates visuals
-function triggerChange(el) {
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
-// For each widget container
-document.querySelectorAll('.third-party-approval').forEach(function (wrap) {
-  const master = wrap.querySelector('.bal-third-party-select .toggle input[type="checkbox"]');
-  if (!master) return;
-
-  const getItemCheckboxes = () =>
-    wrap.querySelectorAll('.bal-select-options input[type="checkbox"]');
-
-  // Apply state to all item checkboxes
-  function setAllItems(checked) {
-    getItemCheckboxes().forEach(function (cb) {
-      if (cb.checked !== checked) {
-        cb.checked = checked;
-        triggerChange(cb);
-      }
-    });
-    updateMasterState();
-  }
-
-  // Keep master checkbox state (checked/indeterminate) in sync with items
-  function updateMasterState() {
-    const items = Array.from(getItemCheckboxes());
-    const total = items.length;
-    const checkedCount = items.filter(cb => cb.checked).length;
-
-    if (checkedCount === 0) {
-      master.indeterminate = false;
-      master.checked = false;
-    } else if (checkedCount === total) {
-      master.indeterminate = false;
-      master.checked = true;
-    } else {
-      master.indeterminate = true;
-    }
-  }
-
-  // 1) Master toggle → (un)check all items
-  master.addEventListener('change', function () {
-    setAllItems(master.checked);
-  });
-
-  // 2) "Unselect All" → uncheck master and all items (supports both class variants)
-  wrap.querySelectorAll(
-    '.bal-select-head .unselect-all, .bal-third-party-select-header .unselect-all'
-  ).forEach(function (btn) {
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      if (master.checked || master.indeterminate) {
-        master.indeterminate = false;
-        master.checked = false;
-        triggerChange(master);
-      }
-      setAllItems(false);
-    });
-  });
-
-  // Also keep master updated when user clicks individual items
-  wrap.addEventListener('change', function (e) {
-    if (e.target.matches('.bal-select-options input[type="checkbox"]')) {
-      updateMasterState();
-    }
-  });
-
-  // 🔹 Robust: prevent dropdown toggling when clicking inside `.toggle`
-  const dropdownToggle = wrap.querySelector('.w-dropdown-toggle');
-  if (dropdownToggle) {
-    const blockIfInsideToggle = function (e) {
-      if (e.target && e.target.closest('.toggle')) {
-        // Block Webflow's dropdown handlers, but DO NOT preventDefault,
-        // so the checkbox still toggles.
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-      }
-    };
-    // Capture-phase listeners for all the usual suspects
-    ['click', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend']
-      .forEach(function (type) {
-        dropdownToggle.addEventListener(type, blockIfInsideToggle, true);
-      });
-  }
-
-  // Initialize state on load
-  updateMasterState();
-});
 })();
 
 //For - Table filter search
