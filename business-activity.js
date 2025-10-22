@@ -4258,8 +4258,17 @@ function openFilterModal(modalId) {
     // Clear existing checkboxes
     checkboxContainer.innerHTML = '';
     
-    // Add each third party as a checkbox
-    thirdParties.forEach((thirdParty, index) => {
+    // Filter out unwanted values: "N/A", null, undefined, empty strings, and whitespace-only strings
+    const validThirdParties = thirdParties.filter(thirdParty => {
+      if (!thirdParty) return false; // null, undefined, empty string
+      const trimmed = thirdParty.trim();
+      if (!trimmed) return false; // whitespace-only strings
+      if (trimmed.toLowerCase() === 'n/a') return false; // "N/A" values
+      return true;
+    });
+    
+    // Add each valid third party as a checkbox
+    validThirdParties.forEach((thirdParty, index) => {
       const checkboxDiv = document.createElement('div');
       checkboxDiv.className = 'bal-dropdown-link';
       
@@ -4290,7 +4299,7 @@ function openFilterModal(modalId) {
       checkboxContainer.appendChild(checkboxDiv);
     });
     
-(`Added ${thirdParties.length} third party checkboxes`);
+    console.log(`Added ${validThirdParties.length} third party checkboxes (filtered from ${thirdParties.length})`);
     
     // Update DOM reference to include new checkboxes
     dom.thirdPartyCheckboxes = document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
