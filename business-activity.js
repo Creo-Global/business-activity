@@ -4299,7 +4299,6 @@ function openFilterModal(modalId) {
       checkboxContainer.appendChild(checkboxDiv);
     });
     
-    console.log(`Added ${validThirdParties.length} third party checkboxes (filtered from ${thirdParties.length})`);
     
     // Update DOM reference to include new checkboxes
     dom.thirdPartyCheckboxes = document.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
@@ -4754,8 +4753,54 @@ async function setupThirdPartyFilter() {
     } catch (error) {
   }
   
+  // Collect all containers that have third party toggles (both desktop and mobile)
+  const containers = [];
+  
+  // Add desktop containers
+  document.querySelectorAll('.third-party-approval').forEach(container => {
+    containers.push(container);
+  });
+  
+  // Find mobile toggle container (it's separate from the modal)
+  const mobileToggleContainer = document.querySelector('.filter-third-party-head');
+  if (mobileToggleContainer) {
+    // The mobile setup is different - the toggle is in one place, checkboxes in another
+    // We need to create a wrapper that includes both
+    const mobileModal = document.querySelector('[data-id="thirdparty"]');
+    if (mobileModal) {
+      // Create a virtual container that can access both toggle and checkboxes
+      const virtualContainer = {
+        querySelector: (selector) => {
+          // Try toggle container first
+          let result = mobileToggleContainer.querySelector(selector);
+          if (!result && mobileModal) {
+            // Try modal container
+            result = mobileModal.querySelector(selector);
+          }
+          return result;
+        },
+        querySelectorAll: (selector) => {
+          // Combine results from both containers
+          const toggleResults = mobileToggleContainer.querySelectorAll(selector);
+          const modalResults = mobileModal ? mobileModal.querySelectorAll(selector) : [];
+          return [...toggleResults, ...modalResults];
+        },
+        addEventListener: (event, handler) => {
+          // Add to both containers
+          mobileToggleContainer.addEventListener(event, handler);
+          if (mobileModal) {
+            mobileModal.addEventListener(event, handler);
+          }
+        }
+      };
+      containers.push(virtualContainer);
+    }
+  }
+  
+  
   // Setup for each third-party approval widget container (desktop/mobile)
-  document.querySelectorAll('.third-party-approval').forEach(function (wrap) {
+  containers.forEach(function (wrap, index) {
+
     // Try multiple selectors to find the master toggle
     const master = wrap.querySelector('#select_all') || 
                    wrap.querySelector('#select_all_item') || 
@@ -4766,18 +4811,24 @@ async function setupThirdPartyFilter() {
       return;
     }
     
+    
 
     // Get all third-party checkboxes - try multiple container selectors
     const getItemCheckboxes = () => {
-      // First try getting from .bal-dropdown-checkbox-wrap (dynamically populated)
+      // First try getting from .bal-dropdown-checkbox-wrap (dynamically populated for desktop)
       let checkboxes = wrap.querySelectorAll('.bal-dropdown-checkbox-wrap input[type="checkbox"]');
+      if (checkboxes.length === 0) {
+        // Try mobile modal specific selector
+        checkboxes = wrap.querySelectorAll('.bal-dropdown-checkbox-wrap.select-listing input[type="checkbox"]');
+      }
       if (checkboxes.length === 0) {
         // Fallback to .bal-select-options (if exists in HTML)
         checkboxes = wrap.querySelectorAll('.bal-select-options input[type="checkbox"]');
       }
       if (checkboxes.length === 0) {
-        // Last fallback to any .bal-dropdown-link checkboxes
-        checkboxes = wrap.querySelectorAll('.bal-dropdown-link input[type="checkbox"]');
+        // Last fallback to any .bal-dropdown-link checkboxes (but NOT the master toggle)
+        checkboxes = Array.from(wrap.querySelectorAll('.bal-dropdown-link input[type="checkbox"]'))
+          .filter(cb => cb !== master);
       }
       return checkboxes;
     };
@@ -5331,32 +5382,25 @@ async function setupThirdPartyFilter() {
     document.addEventListener('click', (e) => {
       // Handle copy button clicks
       if (e.target.closest('.btn-copy')) {
-        console.log("Copy button clicked!");
         e.preventDefault();
         e.stopPropagation();
         const copyBtn = e.target.closest('.btn-copy');
         const row = copyBtn.closest('tr, .bal-wrapper');
         
-        console.log("Row found:", row);
-        console.log("Row dataset:", row?.dataset);
         
         let activityName = '';
         if (row && row.dataset.activityData) {
           const data = JSON.parse(row.dataset.activityData);
           activityName = data['Activity Name'] || '';
-          console.log("Activity name from dataset:", activityName);
         } else {
           // Fallback for mobile items
           const nameElement = row?.querySelector('.bal-category-item-name, .td-text');
           activityName = nameElement ? nameElement.textContent : '';
-          console.log("Activity name from element:", activityName);
         }
         
         if (activityName) {
-          console.log("Copying to clipboard:", activityName);
           navigator.clipboard.writeText(activityName)
             .then(() => {
-              console.log("Copied successfully!");
               // Show feedback
               const originalColor = copyBtn.style.color;
               copyBtn.style.color = '#056633';
@@ -5368,27 +5412,20 @@ async function setupThirdPartyFilter() {
               console.error("Copy failed:", err);
             });
         } else {
-          console.log("No activity name found to copy");
         }
       }
       
       // Handle save button clicks
       if (e.target.closest('.btn-save')) {
-        console.log("Save button clicked!");
         e.preventDefault();
         e.stopPropagation();
         const saveBtn = e.target.closest('.btn-save');
         const row = saveBtn.closest('tr, .bal-wrapper');
         
-        console.log("Save row found:", row);
-        console.log("Save row dataset:", row?.dataset);
-        
         if (row && row.dataset.activityData) {
           const data = JSON.parse(row.dataset.activityData);
-          console.log("Toggling saved item:", data);
           toggleSavedItem(data, saveBtn, row);
         } else {
-          console.log("No activity data found for save");
         }
       }
     });
