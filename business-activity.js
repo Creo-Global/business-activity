@@ -5175,7 +5175,9 @@ async function setupThirdPartyFilter() {
       
       // Dynamically import Supabase client
 ("Importing Supabase client...");
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+      //const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm');
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+      
       supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 ("Supabase client created");
 
