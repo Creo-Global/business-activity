@@ -2705,9 +2705,9 @@ function openFilterModal(modalId) {
     if (data?.length > 0) {
       // Mobile-specific performance optimizations
       if (isMobile) {
-        renderMobileResults(data, append);
+        renderMobileResults(data, page, count, append);
       } else {
-        renderDesktopResults(data, append);
+        renderDesktopResults(data, page, count, append);
       }
     } else {
       // Handle no results case
@@ -2723,7 +2723,13 @@ function openFilterModal(modalId) {
   }
 
   // Separate mobile rendering function for better performance
-  function renderMobileResults(data, append) {
+  function renderMobileResults(data, page, count, append) {
+    // Remove existing load more button if it exists
+    const existingLoadMore = dom.mobileListEl.querySelector('.bal-load-more-container');
+    if (existingLoadMore) {
+      existingLoadMore.remove();
+    }
+
     // Use DocumentFragment for better performance
     const fragment = document.createDocumentFragment();
     
@@ -2733,23 +2739,150 @@ function openFilterModal(modalId) {
       fragment.appendChild(mobileItem);
     });
     
+    // Check if we need a "Load More" button
+    const totalLoaded = page * PER_PAGE;
+    if (count > totalLoaded) {
+      const loadMoreContainer = createLoadMoreButton();
+      fragment.appendChild(loadMoreContainer);
+    }
+    
     // Single DOM append operation
     dom.mobileListEl.appendChild(fragment);
   }
 
-  // Separate desktop rendering function
-  function renderDesktopResults(data, append) {
-    // Use DocumentFragment for better performance
-    const fragment = document.createDocumentFragment();
+  function createLoadMoreButton() {
+    const container = document.createElement('div');
+    container.className = 'bal-load-more-container';
+    container.style.cssText = 'display:flex; justify-content:center; width:100%; padding: 20px 0;';
     
-    data.forEach((item, index) => {
-      const row = createDesktopTableRow(item);
-      fragment.appendChild(row);
+    const button = document.createElement('button');
+    button.className = 'bal-load-more-btn'; // You can style this class in CSS or add inline styles
+    button.textContent = 'Load More';
+    
+    // Basic styling for the button to make it look clickable and nice
+    button.style.cssText = `
+      background-color: transparent;
+      color: #056633;
+      border: 1px solid #056633;
+      padding: 10px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    `;
+    
+    // Hover effect
+    button.addEventListener('mouseover', () => {
+      button.style.backgroundColor = '#056633';
+      button.style.color = '#ffffff';
     });
     
-    // Single DOM append operation
-    dom.tableBodyEl.appendChild(fragment);
+    button.addEventListener('mouseout', () => {
+      button.style.backgroundColor = 'transparent';
+      button.style.color = '#056633';
+    });
+    
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      // Show loader by replacing button logic or just calling renderPage which handles loading state
+      const nextPage = state.currentPage + 1;
+      
+      // Change text to loading...
+      button.textContent = 'Loading...';
+      button.disabled = true;
+      button.style.opacity = '0.7';
+      button.style.cursor = 'wait';
+      
+      renderPage(nextPage, true);
+    });
+    
+    container.appendChild(button);
+    return container;
   }
+
+  // Separate desktop rendering function
+function renderDesktopResults(data, page, count, append) {
+  // Remove existing load more button if it exists
+  const existingLoadMore = dom.tableBodyEl.querySelector('.bal-load-more-row');
+  if (existingLoadMore) {
+    existingLoadMore.remove();
+  }
+
+  // Use DocumentFragment for better performance
+  const fragment = document.createDocumentFragment();
+  
+  data.forEach((item, index) => {
+    const row = createDesktopTableRow(item);
+    fragment.appendChild(row);
+  });
+  
+  // Check if we need a "Load More" button
+  const totalLoaded = page * PER_PAGE;
+  if (count > totalLoaded) {
+    const loadMoreRow = createDesktopLoadMoreButton();
+    fragment.appendChild(loadMoreRow);
+  }
+
+  // Single DOM append operation
+  dom.tableBodyEl.appendChild(fragment);
+}
+
+function createDesktopLoadMoreButton() {
+  const tr = document.createElement('tr');
+  tr.className = 'bal-load-more-row';
+  
+  const td = document.createElement('td');
+  td.colSpan = 100; // Span all columns
+  td.style.textAlign = 'center';
+  td.style.padding = '20px';
+  
+  const button = document.createElement('button');
+  button.className = 'bal-load-more-btn';
+  button.textContent = 'Load More';
+  
+  // Styling
+  button.style.cssText = `
+    background-color: transparent;
+    color: #056633;
+    border: 1px solid #056633;
+    padding: 10px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `;
+  
+  // Hover effect
+  button.addEventListener('mouseover', () => {
+    button.style.backgroundColor = '#056633';
+    button.style.color = '#ffffff';
+  });
+  
+  button.addEventListener('mouseout', () => {
+    button.style.backgroundColor = 'transparent';
+    button.style.color = '#056633';
+  });
+  
+  // Click handler
+  button.addEventListener('click', (e) => {
+    e.preventDefault();
+    const nextPage = state.currentPage + 1;
+    
+    // Change button state to loading
+    button.textContent = 'Loading...';
+    button.disabled = true;
+    button.style.opacity = '0.7';
+    button.style.cursor = 'wait';
+    
+    renderPage(nextPage, true);
+  });
+  
+  td.appendChild(button);
+  tr.appendChild(td);
+  
+  return tr;
+}  
 
   // Helper function to create desktop table row
   function createDesktopTableRow(item) {
@@ -5221,7 +5354,7 @@ async function setupThirdPartyFilter() {
       
       // Set up infinite scroll
 ("Setting up infinite scroll...");
-      setupInfiniteScroll();
+      // setupInfiniteScroll();
       
       // Set up third party approval filter
 ("Setting up third party approval filter...");
@@ -6427,4 +6560,4 @@ setTimeout(() => {
 (`Table ${index}:`, table.id, table.className);
   });
 }, 1000);
-});
+})
