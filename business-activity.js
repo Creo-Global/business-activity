@@ -22,7 +22,7 @@
   // ─── Configuration ─────────────────────────────────────────────
   const PER_PAGE = 20; // Increased to 20 items per page for infinite scroll
   const SUPABASE_URL = 'https://sb.meydanfz.ae';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzU3MjQyMDM2LCJleHAiOjIwNzI4MTgwMzZ9.5YF79Wen41bSpKNOKiT9Wcd_psXf8IV4vgK7RUjOZoI';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3MzU2ODk2MDAsICJleHAiOiAxODkzNDU2MDAwfQ.aBe8_k56hke4Yk8KmoEVrVIh1eGD5m583N3k66j-uww';
 
   // ─── State Management ──────────────────────────────────────────
   // Centralized state for the component
