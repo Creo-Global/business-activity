@@ -6594,16 +6594,14 @@ setTimeout(() => {
       '.bal-modal-wrapper.bal-article-expanded{width:850px!important;max-width:calc(100vw - 24px);transition:width .25s ease}',
       '.bal-related-wrap{margin-top:24px;padding-top:20px;border-top:1px solid #E7E8EF}',
       '.bal-related-title{font-size:16px;font-weight:600;color:#1C1C1C;margin:0 0 14px;line-height:1.3}',
-      '.bal-related-list{display:flex;flex-direction:column;gap:0}',
-      '.bal-related-card{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #E7E8EF;cursor:pointer;text-decoration:none;color:inherit;transition:opacity .15s}',
-      '.bal-related-card:first-child{padding-top:0}',
-      '.bal-related-card:last-child{border-bottom:none;padding-bottom:0}',
-      '.bal-related-card:hover{opacity:.82}',
-      '.bal-related-card-thumb{flex:0 0 72px;width:72px;height:72px;border-radius:8px;overflow:hidden;background:#F1F2F6}',
+      '.bal-related-list{display:flex;flex-direction:column;gap:12px}',
+      '.bal-related-card{display:flex;align-items:center;gap:20px;padding:20px;background:#f0f7ff;border:1px solid #dbeafe;border-radius:14px;cursor:pointer;text-decoration:none;color:inherit;transition:background .15s,border-color .15s,box-shadow .15s}',
+      '.bal-related-card:hover{background:#e8f2ff;border-color:#bfdbfe;box-shadow:0 2px 8px rgba(37,99,235,.08)}',
+      '.bal-related-card-thumb{flex:0 0 80px;width:80px;height:80px;border-radius:8px;overflow:hidden;background:#dbeafe}',
       '.bal-related-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}',
-      '.bal-related-card-body{flex:1;min-width:0}',
-      '.bal-related-card-title{font-size:14px;font-weight:600;line-height:1.45;color:#1C1C1C;margin:0 0 6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
-      '.bal-related-card-link{font-size:13px;font-weight:600;color:#056633;display:inline-flex;align-items:center;gap:4px}',
+      '.bal-related-card-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:8px}',
+      '.bal-related-card-title{font-size:15px;font-weight:700;line-height:1.45;color:#1e293b;margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+      '.bal-related-card-link{font-size:14px;font-weight:400;color:#2563eb;display:inline-flex;align-items:center;gap:4px}',
       '.bal-related-back{display:none;align-items:center;gap:6px;background:transparent;border:none;color:#056633;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin:0 12px 0 0}',
       '.bal-article-view{padding:0 0 24px}',
       '.bal-article-view .mfz-article-featured-img{width:100%;border-radius:8px;margin:0 0 20px;display:block;object-fit:cover}',
@@ -6732,7 +6730,7 @@ setTimeout(() => {
 
     const link = document.createElement('span');
     link.className = 'bal-related-card-link';
-    link.innerHTML = 'Read more<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    link.textContent = 'Read Activity Guide \u2192';
 
     body.appendChild(title);
     body.appendChild(link);
