@@ -6560,7 +6560,7 @@ setTimeout(() => {
 (`Table ${index}:`, table.id, table.className);
   });
 }, 1000);
-})
+})();
 
 /* ============================================================================
  * Related Articles (Webflow CMS) in the Activity Details sidebar
@@ -6813,4 +6813,4 @@ setTimeout(() => {
       loadRelated(currentCode);
     }, 30);
   }, false);
-})()
+})();
