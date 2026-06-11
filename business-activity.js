@@ -6586,73 +6586,76 @@ setTimeout(() => {
   const getPopup = () => document.querySelector('.bal-detail-popup');
 
   // Ensure our extra DOM exists inside the sidebar (created once, reused).
+  // Anchors to the live Webflow markup:
+  //   .bal-detail-popup > .bal-modal-wrapper > [.bal-detail-popup-header, .div-block-844 > table.bal-detail-table]
+  // and falls back to the JS-generated structure (.bal-detail-popup-content / -body).
   function ensure(popup) {
-    const content = popup.querySelector('.bal-detail-popup-content');
-    if (!content) return null;
-    if (content.dataset.relatedReady === '1') return content;
-    content.dataset.relatedReady = '1';
+    if (popup.dataset.relatedReady === '1') return popup;
 
-    const header = content.querySelector('.bal-detail-popup-header');
-    const body = content.querySelector('.bal-detail-popup-body');
+    const wrapper = popup.querySelector('.bal-modal-wrapper') || popup.querySelector('.bal-detail-popup-content');
+    const header = popup.querySelector('.bal-detail-popup-header');
+    const table = popup.querySelector('.bal-detail-table');
+    // Put our content right after the details table, in its own container.
+    const bodyContainer = (table && table.parentNode) || popup.querySelector('.bal-detail-popup-body') || wrapper;
+    if (!bodyContainer) return null;
+    popup.dataset.relatedReady = '1';
 
-    // Back button (top-left), hidden until an article is open.
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'bal-related-back';
-    back.setAttribute('aria-label', 'Back to activity details');
-    back.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span>';
-    back.style.cssText = 'display:none;align-items:center;gap:6px;background:transparent;border:none;color:#056633;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:4px;';
-    back.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); showDetailsView(popup); });
-    if (header && header.parentNode) header.parentNode.insertBefore(back, header);
-    else content.insertBefore(back, content.firstChild);
+    // Back button (top-left of the header), hidden until an article is open.
+    if (header) {
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'bal-related-back';
+      back.setAttribute('aria-label', 'Back to activity details');
+      back.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span>';
+      back.style.cssText = 'display:none;align-items:center;gap:6px;background:transparent;border:none;color:#056633;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin:0 12px 0 0;';
+      back.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); showDetailsView(popup); });
+      header.insertBefore(back, header.firstChild);
+    }
 
-    // Related list (inside the scrollable body, after the details table).
+    // Related list (after the details table, same container).
     const related = document.createElement('div');
     related.className = 'bal-related-wrap';
     related.style.cssText = 'margin-top:22px;';
     related.innerHTML = '<h3 class="bal-related-title" style="font-size:15px;font-weight:700;color:#1C1C1C;margin:0 0 12px;">Related Articles</h3><div class="bal-related-list"></div>';
 
-    // Article detail view (inside the body), hidden by default.
+    // Article detail view (hidden by default).
     const article = document.createElement('div');
     article.className = 'bal-article-view';
     article.style.cssText = 'display:none;';
 
-    if (body) { body.appendChild(related); body.appendChild(article); }
-    else { content.appendChild(related); content.appendChild(article); }
+    bodyContainer.appendChild(related);
+    bodyContainer.appendChild(article);
+    return popup;
+  }
 
-    return content;
+  function titleEl(popup) {
+    return popup.querySelector('.bal-detail-popup-title') || popup.querySelector('.bal-detail-popup-header h2');
   }
 
   function showDetailsView(popup) {
-    const c = popup.querySelector('.bal-detail-popup-content');
-    if (!c) return;
-    const table = c.querySelector('.bal-detail-table');
-    const related = c.querySelector('.bal-related-wrap');
-    const article = c.querySelector('.bal-article-view');
-    const back = c.querySelector('.bal-related-back');
-    const header = c.querySelector('.bal-detail-popup-header');
+    const table = popup.querySelector('.bal-detail-table');
+    const related = popup.querySelector('.bal-related-wrap');
+    const article = popup.querySelector('.bal-article-view');
+    const back = popup.querySelector('.bal-related-back');
+    const title = titleEl(popup);
     if (table) table.style.display = '';
     if (related) related.style.display = '';
     if (article) { article.style.display = 'none'; article.innerHTML = ''; }
     if (back) back.style.display = 'none';
-    if (header) header.style.display = '';
+    if (title) title.style.display = '';
   }
 
   function showArticleView(popup) {
-    const c = popup.querySelector('.bal-detail-popup-content');
-    if (!c) return;
-    const table = c.querySelector('.bal-detail-table');
-    const related = c.querySelector('.bal-related-wrap');
-    const article = c.querySelector('.bal-article-view');
-    const back = c.querySelector('.bal-related-back');
-    const header = c.querySelector('.bal-detail-popup-header');
+    const table = popup.querySelector('.bal-detail-table');
+    const related = popup.querySelector('.bal-related-wrap');
+    const article = popup.querySelector('.bal-article-view');
+    const back = popup.querySelector('.bal-related-back');
+    const title = titleEl(popup);
     if (table) table.style.display = 'none';
     if (related) related.style.display = 'none';
     if (article) article.style.display = '';
     if (back) back.style.display = 'inline-flex';
-    if (header) header.style.display = 'none';
-    const body = c.querySelector('.bal-detail-popup-body');
-    if (body && body.scrollTo) body.scrollTo(0, 0);
+    if (title) title.style.display = 'none';
   }
 
   function buildCard(item) {
@@ -6704,10 +6707,9 @@ setTimeout(() => {
   async function loadRelated(code) {
     const popup = getPopup();
     if (!popup) return;
-    const content = ensure(popup);
-    if (!content) return;
-    const wrap = content.querySelector('.bal-related-wrap');
-    const list = content.querySelector('.bal-related-list');
+    if (!ensure(popup)) return;
+    const wrap = popup.querySelector('.bal-related-wrap');
+    const list = popup.querySelector('.bal-related-list');
     if (!wrap || !list) return;
 
     const token = ++reqToken;
@@ -6732,9 +6734,8 @@ setTimeout(() => {
   async function openArticle(itemId, collectionId) {
     const popup = getPopup();
     if (!popup) return;
-    const content = ensure(popup);
-    if (!content) return;
-    const article = content.querySelector('.bal-article-view');
+    if (!ensure(popup)) return;
+    const article = popup.querySelector('.bal-article-view');
     if (!article) return;
 
     showArticleView(popup);
