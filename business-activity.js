@@ -6581,9 +6581,57 @@ setTimeout(() => {
   const HEADERS = { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY };
 
   let currentCode = null;
-  let reqToken = 0; // guards against out-of-order responses when switching activities fast
+  let reqToken = 0;
 
   const getPopup = () => document.querySelector('.bal-detail-popup');
+  const getWrapper = (popup) => popup && popup.querySelector('.bal-modal-wrapper');
+
+  function injectStyles() {
+    if (document.getElementById('bal-related-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'bal-related-styles';
+    style.textContent = [
+      '.bal-modal-wrapper.bal-article-expanded{width:850px!important;max-width:calc(100vw - 24px);transition:width .25s ease}',
+      '.bal-related-wrap{margin-top:24px;padding-top:20px;border-top:1px solid #E7E8EF}',
+      '.bal-related-title{font-size:16px;font-weight:600;color:#1C1C1C;margin:0 0 14px;line-height:1.3}',
+      '.bal-related-list{display:flex;flex-direction:column;gap:0}',
+      '.bal-related-card{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #E7E8EF;cursor:pointer;text-decoration:none;color:inherit;transition:opacity .15s}',
+      '.bal-related-card:first-child{padding-top:0}',
+      '.bal-related-card:last-child{border-bottom:none;padding-bottom:0}',
+      '.bal-related-card:hover{opacity:.82}',
+      '.bal-related-card-thumb{flex:0 0 72px;width:72px;height:72px;border-radius:8px;overflow:hidden;background:#F1F2F6}',
+      '.bal-related-card-thumb img{width:100%;height:100%;object-fit:cover;display:block}',
+      '.bal-related-card-body{flex:1;min-width:0}',
+      '.bal-related-card-title{font-size:14px;font-weight:600;line-height:1.45;color:#1C1C1C;margin:0 0 6px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}',
+      '.bal-related-card-link{font-size:13px;font-weight:600;color:#056633;display:inline-flex;align-items:center;gap:4px}',
+      '.bal-related-back{display:none;align-items:center;gap:6px;background:transparent;border:none;color:#056633;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin:0 12px 0 0}',
+      '.bal-article-view{padding:0 0 24px}',
+      '.bal-article-view .mfz-article-featured-img{width:100%;border-radius:8px;margin:0 0 20px;display:block;object-fit:cover}',
+      '.bal-article-view .mfz-article-title{font-size:1.75rem;font-weight:600;line-height:1.3;margin:0 0 1rem;color:#1C1C1C}',
+      '.bal-article-view .mfz-article-the-content h2{font-size:1.75rem;font-weight:600;padding-top:1.5rem;padding-bottom:1rem;margin:0;color:#1C1C1C}',
+      '.bal-article-view .mfz-article-the-content h3{font-size:22px;font-weight:600;margin:1rem 0 .75rem;color:#1C1C1C}',
+      '.bal-article-view .mfz-article-the-content p,.bal-article-view .mfz-article-the-content-wrapper.w-richtext p{margin:0 0 1rem;line-height:1.7;color:#333}',
+      '.bal-article-view .mfz-article-the-content ol,.bal-article-view .mfz-article-the-content ul,.bal-article-view .mfz-article-the-content-wrapper.w-richtext ol,.bal-article-view .mfz-article-the-content-wrapper.w-richtext ul{margin:0 0 1rem 1.25rem;line-height:1.7;color:#333}',
+      '.bal-article-view .mfz-article-the-content li,.bal-article-view .mfz-article-the-content-wrapper.w-richtext li{margin-bottom:.35rem}',
+      '.bal-article-view .mfz-article-the-content a,.bal-article-view .mfz-article-the-content-wrapper.w-richtext a{-webkit-text-fill-color:transparent;background-image:linear-gradient(90deg,#5ed1ad,#08292e 100%);-webkit-background-clip:text;background-clip:text;text-decoration:none;transition:all .3s ease}',
+      '.bal-article-view .mfz-article-the-content a:hover,.bal-article-view .mfz-article-the-content-wrapper.w-richtext a:hover{background-image:linear-gradient(90deg,#5ed1ad,#5ed1ad 50%);border-bottom:1px solid #5ed1ad}',
+      '.bal-article-view .mfz-article-the-content table,.bal-article-view .mfz-article-the-content-wrapper.w-richtext table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:14px}',
+      '.bal-article-view .mfz-article-the-content th,.bal-article-view .mfz-article-the-content td,.bal-article-view .mfz-article-the-content-wrapper.w-richtext th,.bal-article-view .mfz-article-the-content-wrapper.w-richtext td{padding:8px;border:1px solid #E7E8EF;text-align:left;vertical-align:top}',
+      '.bal-article-view .mfz-article-the-content img,.bal-article-view .mfz-article-the-content-wrapper.w-richtext img{max-width:100%;height:auto;border-radius:6px;margin:1rem 0}',
+      '.bal-article-view .mdf-post-table{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:1.5rem 0}',
+      '.bal-article-view .mfz-faq-item{border-bottom:1px solid rgba(0,0,0,.08);margin-bottom:1.5rem}',
+      '.bal-article-view .mfz-faq-question{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:20px 0;cursor:pointer;font-size:18px;font-weight:600;line-height:1.4}',
+      '.bal-article-view .mfz-faq-answer{padding:0 0 24px;line-height:1.7}',
+      '.bal-article-view .mfz-article-toc{margin:1rem 0}',
+      '.bal-article-view .mfz-toc-list{list-style:none;margin:0;padding:0}',
+      '.bal-article-view .mfz-toc-link{display:flex;align-items:center;gap:12px;padding:6px 8px;color:#333;text-decoration:none;font-size:15px;line-height:1.5}',
+      '.bal-article-view .mfz-toc-link:hover{color:#4ca287}',
+      '.bal-article-open-full{display:inline-flex;align-items:center;gap:6px;margin-top:24px;color:#056633;font-size:13px;font-weight:600;text-decoration:none}',
+      '.bal-article-open-full:hover{text-decoration:underline}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+  injectStyles();
 
   // Ensure our extra DOM exists inside the sidebar (created once, reused).
   // Anchors to the live Webflow markup:
@@ -6607,21 +6655,17 @@ setTimeout(() => {
       back.className = 'bal-related-back';
       back.setAttribute('aria-label', 'Back to activity details');
       back.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span>';
-      back.style.cssText = 'display:none;align-items:center;gap:6px;background:transparent;border:none;color:#056633;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin:0 12px 0 0;';
       back.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); showDetailsView(popup); });
       header.insertBefore(back, header.firstChild);
     }
 
-    // Related list (after the details table, same container).
     const related = document.createElement('div');
     related.className = 'bal-related-wrap';
-    related.style.cssText = 'margin-top:22px;';
-    related.innerHTML = '<h3 class="bal-related-title" style="font-size:15px;font-weight:700;color:#1C1C1C;margin:0 0 12px;">Related Articles</h3><div class="bal-related-list"></div>';
+    related.innerHTML = '<h3 class="bal-related-title">Related Articles</h3><div class="bal-related-list"></div>';
 
-    // Article detail view (hidden by default).
     const article = document.createElement('div');
     article.className = 'bal-article-view';
-    article.style.cssText = 'display:none;';
+    article.style.display = 'none';
 
     bodyContainer.appendChild(related);
     bodyContainer.appendChild(article);
@@ -6633,11 +6677,13 @@ setTimeout(() => {
   }
 
   function showDetailsView(popup) {
+    const wrapper = getWrapper(popup);
     const table = popup.querySelector('.bal-detail-table');
     const related = popup.querySelector('.bal-related-wrap');
     const article = popup.querySelector('.bal-article-view');
     const back = popup.querySelector('.bal-related-back');
     const title = titleEl(popup);
+    if (wrapper) wrapper.classList.remove('bal-article-expanded');
     if (table) table.style.display = '';
     if (related) related.style.display = '';
     if (article) { article.style.display = 'none'; article.innerHTML = ''; }
@@ -6646,61 +6692,62 @@ setTimeout(() => {
   }
 
   function showArticleView(popup) {
+    const wrapper = getWrapper(popup);
     const table = popup.querySelector('.bal-detail-table');
     const related = popup.querySelector('.bal-related-wrap');
     const article = popup.querySelector('.bal-article-view');
     const back = popup.querySelector('.bal-related-back');
     const title = titleEl(popup);
+    if (wrapper) wrapper.classList.add('bal-article-expanded');
     if (table) table.style.display = 'none';
     if (related) related.style.display = 'none';
     if (article) article.style.display = '';
     if (back) back.style.display = 'inline-flex';
     if (title) title.style.display = 'none';
+    if (wrapper && wrapper.scrollTo) wrapper.scrollTo(0, 0);
   }
 
   function buildCard(item) {
     const card = document.createElement('div');
     card.className = 'bal-related-card';
-    card.style.cssText = 'display:flex;gap:12px;padding:10px;border:1px solid #E7E8EF;border-radius:8px;margin-bottom:10px;align-items:flex-start;cursor:pointer;transition:border-color .15s,box-shadow .15s;';
-    card.addEventListener('mouseenter', function () { card.style.borderColor = '#056633'; card.style.boxShadow = '0 2px 8px rgba(5,102,51,.08)'; });
-    card.addEventListener('mouseleave', function () { card.style.borderColor = '#E7E8EF'; card.style.boxShadow = 'none'; });
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
 
     const thumb = document.createElement('div');
-    thumb.style.cssText = 'flex:0 0 64px;width:64px;height:64px;border-radius:6px;overflow:hidden;background:#F1F2F6;';
+    thumb.className = 'bal-related-card-thumb';
     if (item.image) {
       const img = document.createElement('img');
       img.src = item.image;
       img.alt = item.image_alt || item.title || '';
       img.loading = 'lazy';
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
       thumb.appendChild(img);
     }
 
-    const right = document.createElement('div');
-    right.style.cssText = 'flex:1;min-width:0;';
+    const body = document.createElement('div');
+    body.className = 'bal-related-card-body';
 
-    const title = document.createElement('div');
+    const title = document.createElement('p');
+    title.className = 'bal-related-card-title';
     title.textContent = item.title || 'Untitled';
-    title.style.cssText = 'font-weight:600;font-size:14px;line-height:1.35;color:#1C1C1C;margin-bottom:4px;';
 
-    const excerpt = document.createElement('div');
-    excerpt.textContent = item.excerpt || '';
-    excerpt.style.cssText = 'font-size:12px;color:#6B7094;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
+    const link = document.createElement('span');
+    link.className = 'bal-related-card-link';
+    link.innerHTML = 'Read more<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = 'Read more';
-    btn.style.cssText = 'margin-top:8px;background:transparent;color:#056633;border:1px solid #056633;padding:5px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;';
-
-    right.appendChild(title);
-    if (item.excerpt) right.appendChild(excerpt);
-    right.appendChild(btn);
+    body.appendChild(title);
+    body.appendChild(link);
     card.appendChild(thumb);
-    card.appendChild(right);
+    card.appendChild(body);
 
-    const open = function (e) { e.preventDefault(); e.stopPropagation(); openArticle(item.item_id, item.collection_id); };
-    btn.addEventListener('click', open);
+    const open = function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openArticle(item.item_id, item.collection_id);
+    };
     card.addEventListener('click', open);
+    card.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); }
+    });
     return card;
   }
 
@@ -6752,34 +6799,40 @@ setTimeout(() => {
 
       article.innerHTML = '';
 
+      const contentWrap = document.createElement('div');
+      contentWrap.className = 'mfz-article-the-content mfz-article-activity-hub-content';
+
       if (item.image) {
         const img = document.createElement('img');
         img.src = item.image;
         img.alt = item.image_alt || item.title || '';
-        img.style.cssText = 'width:100%;border-radius:8px;margin-bottom:16px;display:block;object-fit:cover;';
+        img.className = 'mfz-article-featured-img';
         article.appendChild(img);
       }
 
       const h = document.createElement('h2');
+      h.className = 'mfz-article-title';
       h.textContent = item.title || fd['name'] || 'Article';
-      h.style.cssText = 'font-size:20px;line-height:1.3;margin:0 0 14px;color:#1C1C1C;font-weight:700;';
-      article.appendChild(h);
+      contentWrap.appendChild(h);
 
       const bodyHtml = fd['post-body'] || fd['post-summary'] || '';
       const bodyEl = document.createElement('div');
-      bodyEl.className = 'bal-article-body';
-      bodyEl.style.cssText = 'font-size:14px;line-height:1.65;color:#333;word-wrap:break-word;';
+      bodyEl.className = 'mfz-article-the-content-wrapper w-richtext';
       bodyEl.innerHTML = bodyHtml;
-      bodyEl.querySelectorAll('img').forEach(function (im) { im.style.maxWidth = '100%'; im.style.height = 'auto'; im.style.borderRadius = '6px'; });
-      article.appendChild(bodyEl);
+      bodyEl.querySelectorAll('a[href]').forEach(function (a) {
+        if (!a.target) a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+      });
+      contentWrap.appendChild(bodyEl);
+      article.appendChild(contentWrap);
 
       if (item.url) {
         const a = document.createElement('a');
         a.href = item.url;
         a.target = '_blank';
-        a.rel = 'noopener';
-        a.textContent = 'Open full article \u2197';
-        a.style.cssText = 'display:inline-block;margin-top:18px;color:#056633;font-size:13px;font-weight:600;text-decoration:none;';
+        a.rel = 'noopener noreferrer';
+        a.className = 'bal-article-open-full';
+        a.innerHTML = 'Open full article<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         article.appendChild(a);
       }
     } catch (err) {
