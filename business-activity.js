@@ -6561,3 +6561,255 @@ setTimeout(() => {
   });
 }, 1000);
 })
+
+/* ============================================================================
+ * Related Articles (Webflow CMS) in the Activity Details sidebar
+ * ----------------------------------------------------------------------------
+ * Self-contained add-on. Does NOT modify any existing function. It listens for
+ * activity row/card clicks (they carry data-activity-data / data-activity-code),
+ * then once the existing ".bal-detail-popup" sidebar is open it:
+ *   1. Renders a "Related Articles" list (slim cards) below the details table,
+ *      fetched from the Supabase Webflow proxy by the activity Code.
+ *   2. On "Read more" / card click, fetches the full article and shows it in the
+ *      same sidebar, with a Back button (top-left) and the existing close (right).
+ *      Back returns to the activity details + related list view.
+ * Data source: https://sb.meydanfz.ae/functions/v1/webflow  (server-side proxy)
+ * ========================================================================== */
+(function () {
+  const FN_URL = 'https://sb.meydanfz.ae/functions/v1/webflow';
+  const ANON_KEY = 'eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJyb2xlIjogImFub24iLCAiaXNzIjogInN1cGFiYXNlIiwgImlhdCI6IDE3MzU2ODk2MDAsICJleHAiOiAxODkzNDU2MDAwfQ.aBe8_k56hke4Yk8KmoEVrVIh1eGD5m583N3k66j-uww';
+  const HEADERS = { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY };
+
+  let currentCode = null;
+  let reqToken = 0; // guards against out-of-order responses when switching activities fast
+
+  const getPopup = () => document.querySelector('.bal-detail-popup');
+
+  // Ensure our extra DOM exists inside the sidebar (created once, reused).
+  function ensure(popup) {
+    const content = popup.querySelector('.bal-detail-popup-content');
+    if (!content) return null;
+    if (content.dataset.relatedReady === '1') return content;
+    content.dataset.relatedReady = '1';
+
+    const header = content.querySelector('.bal-detail-popup-header');
+    const body = content.querySelector('.bal-detail-popup-body');
+
+    // Back button (top-left), hidden until an article is open.
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'bal-related-back';
+    back.setAttribute('aria-label', 'Back to activity details');
+    back.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span>';
+    back.style.cssText = 'display:none;align-items:center;gap:6px;background:transparent;border:none;color:#056633;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:4px;';
+    back.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); showDetailsView(popup); });
+    if (header && header.parentNode) header.parentNode.insertBefore(back, header);
+    else content.insertBefore(back, content.firstChild);
+
+    // Related list (inside the scrollable body, after the details table).
+    const related = document.createElement('div');
+    related.className = 'bal-related-wrap';
+    related.style.cssText = 'margin-top:22px;';
+    related.innerHTML = '<h3 class="bal-related-title" style="font-size:15px;font-weight:700;color:#1C1C1C;margin:0 0 12px;">Related Articles</h3><div class="bal-related-list"></div>';
+
+    // Article detail view (inside the body), hidden by default.
+    const article = document.createElement('div');
+    article.className = 'bal-article-view';
+    article.style.cssText = 'display:none;';
+
+    if (body) { body.appendChild(related); body.appendChild(article); }
+    else { content.appendChild(related); content.appendChild(article); }
+
+    return content;
+  }
+
+  function showDetailsView(popup) {
+    const c = popup.querySelector('.bal-detail-popup-content');
+    if (!c) return;
+    const table = c.querySelector('.bal-detail-table');
+    const related = c.querySelector('.bal-related-wrap');
+    const article = c.querySelector('.bal-article-view');
+    const back = c.querySelector('.bal-related-back');
+    const header = c.querySelector('.bal-detail-popup-header');
+    if (table) table.style.display = '';
+    if (related) related.style.display = '';
+    if (article) { article.style.display = 'none'; article.innerHTML = ''; }
+    if (back) back.style.display = 'none';
+    if (header) header.style.display = '';
+  }
+
+  function showArticleView(popup) {
+    const c = popup.querySelector('.bal-detail-popup-content');
+    if (!c) return;
+    const table = c.querySelector('.bal-detail-table');
+    const related = c.querySelector('.bal-related-wrap');
+    const article = c.querySelector('.bal-article-view');
+    const back = c.querySelector('.bal-related-back');
+    const header = c.querySelector('.bal-detail-popup-header');
+    if (table) table.style.display = 'none';
+    if (related) related.style.display = 'none';
+    if (article) article.style.display = '';
+    if (back) back.style.display = 'inline-flex';
+    if (header) header.style.display = 'none';
+    const body = c.querySelector('.bal-detail-popup-body');
+    if (body && body.scrollTo) body.scrollTo(0, 0);
+  }
+
+  function buildCard(item) {
+    const card = document.createElement('div');
+    card.className = 'bal-related-card';
+    card.style.cssText = 'display:flex;gap:12px;padding:10px;border:1px solid #E7E8EF;border-radius:8px;margin-bottom:10px;align-items:flex-start;cursor:pointer;transition:border-color .15s,box-shadow .15s;';
+    card.addEventListener('mouseenter', function () { card.style.borderColor = '#056633'; card.style.boxShadow = '0 2px 8px rgba(5,102,51,.08)'; });
+    card.addEventListener('mouseleave', function () { card.style.borderColor = '#E7E8EF'; card.style.boxShadow = 'none'; });
+
+    const thumb = document.createElement('div');
+    thumb.style.cssText = 'flex:0 0 64px;width:64px;height:64px;border-radius:6px;overflow:hidden;background:#F1F2F6;';
+    if (item.image) {
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.image_alt || item.title || '';
+      img.loading = 'lazy';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+      thumb.appendChild(img);
+    }
+
+    const right = document.createElement('div');
+    right.style.cssText = 'flex:1;min-width:0;';
+
+    const title = document.createElement('div');
+    title.textContent = item.title || 'Untitled';
+    title.style.cssText = 'font-weight:600;font-size:14px;line-height:1.35;color:#1C1C1C;margin-bottom:4px;';
+
+    const excerpt = document.createElement('div');
+    excerpt.textContent = item.excerpt || '';
+    excerpt.style.cssText = 'font-size:12px;color:#6B7094;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Read more';
+    btn.style.cssText = 'margin-top:8px;background:transparent;color:#056633;border:1px solid #056633;padding:5px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;';
+
+    right.appendChild(title);
+    if (item.excerpt) right.appendChild(excerpt);
+    right.appendChild(btn);
+    card.appendChild(thumb);
+    card.appendChild(right);
+
+    const open = function (e) { e.preventDefault(); e.stopPropagation(); openArticle(item.item_id, item.collection_id); };
+    btn.addEventListener('click', open);
+    card.addEventListener('click', open);
+    return card;
+  }
+
+  async function loadRelated(code) {
+    const popup = getPopup();
+    if (!popup) return;
+    const content = ensure(popup);
+    if (!content) return;
+    const wrap = content.querySelector('.bal-related-wrap');
+    const list = content.querySelector('.bal-related-list');
+    if (!wrap || !list) return;
+
+    const token = ++reqToken;
+    wrap.style.display = '';
+    list.innerHTML = '<div style="padding:8px 0;color:#6B7094;font-size:13px;">Loading related articles…</div>';
+
+    try {
+      const res = await fetch(FN_URL + '?mode=summary&code=' + encodeURIComponent(code), { headers: HEADERS });
+      if (token !== reqToken) return; // a newer activity was opened
+      const data = await res.json();
+      const items = (data && Array.isArray(data.items)) ? data.items : [];
+      if (!items.length) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
+      list.innerHTML = '';
+      items.forEach(function (it) { list.appendChild(buildCard(it)); });
+    } catch (err) {
+      if (token !== reqToken) return;
+      wrap.style.display = 'none';
+      list.innerHTML = '';
+    }
+  }
+
+  async function openArticle(itemId, collectionId) {
+    const popup = getPopup();
+    if (!popup) return;
+    const content = ensure(popup);
+    if (!content) return;
+    const article = content.querySelector('.bal-article-view');
+    if (!article) return;
+
+    showArticleView(popup);
+    article.innerHTML = '<div style="padding:18px 0;color:#6B7094;font-size:14px;">Loading article…</div>';
+
+    try {
+      const url = FN_URL + '?mode=item&item_id=' + encodeURIComponent(itemId) +
+        (collectionId ? '&collection_id=' + encodeURIComponent(collectionId) : '');
+      const res = await fetch(url, { headers: HEADERS });
+      const data = await res.json();
+      const item = data && data.item;
+      if (!item) { article.innerHTML = '<div style="padding:18px 0;color:#B00020;font-size:14px;">Article could not be loaded.</div>'; return; }
+      const fd = item.fieldData || {};
+
+      article.innerHTML = '';
+
+      if (item.image) {
+        const img = document.createElement('img');
+        img.src = item.image;
+        img.alt = item.image_alt || item.title || '';
+        img.style.cssText = 'width:100%;border-radius:8px;margin-bottom:16px;display:block;object-fit:cover;';
+        article.appendChild(img);
+      }
+
+      const h = document.createElement('h2');
+      h.textContent = item.title || fd['name'] || 'Article';
+      h.style.cssText = 'font-size:20px;line-height:1.3;margin:0 0 14px;color:#1C1C1C;font-weight:700;';
+      article.appendChild(h);
+
+      const bodyHtml = fd['post-body'] || fd['post-summary'] || '';
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'bal-article-body';
+      bodyEl.style.cssText = 'font-size:14px;line-height:1.65;color:#333;word-wrap:break-word;';
+      bodyEl.innerHTML = bodyHtml;
+      bodyEl.querySelectorAll('img').forEach(function (im) { im.style.maxWidth = '100%'; im.style.height = 'auto'; im.style.borderRadius = '6px'; });
+      article.appendChild(bodyEl);
+
+      if (item.url) {
+        const a = document.createElement('a');
+        a.href = item.url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = 'Open full article \u2197';
+        a.style.cssText = 'display:inline-block;margin-top:18px;color:#056633;font-size:13px;font-weight:600;text-decoration:none;';
+        article.appendChild(a);
+      }
+    } catch (err) {
+      article.innerHTML = '<div style="padding:18px 0;color:#B00020;font-size:14px;">Failed to load the article. Please try again.</div>';
+    }
+  }
+
+  // Detect activity row/card clicks anywhere, read the Code, then enhance the
+  // sidebar once the existing handlers have opened + populated it.
+  document.addEventListener('click', function (e) {
+    // Ignore clicks inside the popups themselves and on action controls.
+    if (e.target.closest('.bal-detail-popup, .bla-saved-modal')) return;
+    if (e.target.closest('.btn-copy, .btn-save, .btn-search, .btn-clear, button, a')) return;
+
+    const row = e.target.closest('[data-activity-code], [data-activity-data]');
+    if (!row) return;
+
+    let code = row.getAttribute('data-activity-code');
+    if (!code && row.dataset && row.dataset.activityData) {
+      try { code = JSON.parse(row.dataset.activityData).Code; } catch (_) { /* ignore */ }
+    }
+    if (!code) return;
+    currentCode = String(code).trim();
+
+    // Let the existing click handlers create/populate/open the sidebar first.
+    setTimeout(function () {
+      const popup = getPopup();
+      if (!popup) return;
+      ensure(popup);
+      showDetailsView(popup);
+      loadRelated(currentCode);
+    }, 30);
+  }, false);
+})()
