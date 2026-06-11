@@ -6789,6 +6789,9 @@ setTimeout(() => {
 
   // Detect activity row/card clicks anywhere, read the Code, then enhance the
   // sidebar once the existing handlers have opened + populated it.
+  // IMPORTANT: use the CAPTURE phase. The site's row click handler calls
+  // event.stopPropagation(), which prevents bubble-phase document listeners
+  // from ever firing. Capture runs before that, so we still see every click.
   document.addEventListener('click', function (e) {
     // Ignore clicks inside the popups themselves and on action controls.
     if (e.target.closest('.bal-detail-popup, .bla-saved-modal')) return;
@@ -6812,5 +6815,5 @@ setTimeout(() => {
       showDetailsView(popup);
       loadRelated(currentCode);
     }, 30);
-  }, false);
+  }, true);
 })();
