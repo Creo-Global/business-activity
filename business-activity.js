@@ -6591,7 +6591,7 @@ setTimeout(() => {
     const style = document.createElement('style');
     style.id = 'bal-related-styles';
     style.textContent = [
-      '.bal-modal-wrapper.bal-article-expanded{width:850px!important;max-width:calc(100vw - 24px);transition:width .25s ease}',
+      '@media (min-width:768px){.bal-modal-wrapper.bal-article-expanded{width:850px!important;max-width:calc(100vw - 24px);transition:width .25s ease}}',
       '.bal-related-wrap{margin-top:24px;padding-top:20px;border-top:1px solid #E7E8EF}',
       '.bal-related-title{font-size:16px;font-weight:600;color:#1C1C1C;margin:0 0 14px;line-height:1.3}',
       '.bal-related-list{display:flex;flex-direction:column;gap:12px}',
@@ -6627,7 +6627,22 @@ setTimeout(() => {
       '.bal-article-view .mfz-toc-link{display:flex;align-items:center;gap:12px;padding:6px 8px;color:#333;text-decoration:none;font-size:15px;line-height:1.5}',
       '.bal-article-view .mfz-toc-link:hover{color:#4ca287}',
       '.bal-article-open-full{display:inline-flex;align-items:center;gap:6px;margin-top:24px;color:#056633;font-size:13px;font-weight:600;text-decoration:none}',
-      '.bal-article-open-full:hover{text-decoration:underline}'
+      '.bal-article-open-full:hover{text-decoration:underline}',
+      '@media (max-width:767px){',
+      '.bal-article-view .mfz-article-title{font-size:1.25rem;line-height:1.35;margin:0 0 .5rem}',
+      '.bal-article-view .mfz-article-the-content h2{font-size:1.2rem;padding-top:.75rem;padding-bottom:.5rem}',
+      '.bal-article-view .mfz-article-the-content h3{font-size:1.05rem;margin:.75rem 0 .5rem}',
+      '.bal-article-view .mfz-article-the-content h4{font-size:.95rem}',
+      '.bal-article-view .mfz-article-the-content p,.bal-article-view .mfz-article-the-content-wrapper.w-richtext p{font-size:14px;line-height:1.6;margin:0 0 .85rem}',
+      '.bal-article-view .mfz-article-the-content ol,.bal-article-view .mfz-article-the-content ul,.bal-article-view .mfz-article-the-content-wrapper.w-richtext ol,.bal-article-view .mfz-article-the-content-wrapper.w-richtext ul{font-size:14px;line-height:1.6}',
+      '.bal-article-view .mfz-article-the-content table,.bal-article-view .mfz-article-the-content-wrapper.w-richtext table{font-size:13px}',
+      '.bal-article-view .mfz-faq-question{font-size:16px;padding:14px 0}',
+      '.bal-article-view .mfz-faq-answer{font-size:14px}',
+      '.bal-article-view .mfz-toc-link{font-size:14px}',
+      '.bal-article-featured-wrap,.bal-article-view .mfz-article-featured-img{max-height:150px;height:150px}',
+      '.bal-related-card-title{font-size:14px}',
+      '.bal-related-card-link{font-size:13px}',
+      '}'
     ].join('\n');
     document.head.appendChild(style);
   }
